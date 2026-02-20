@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.wanyj.auth.mapper.UserRoleMapper">
+
+    <!-- Result Map -->
+    <resultMap id="UserRoleResultMap" type="cn.wanyj.auth.entity.UserRole">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="roleId" column="role_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- Find By User Id -->
+    <select id="findByUserId" resultMap="UserRoleResultMap">
+        SELECT id, user_id, role_id, created_at
+        FROM user_role
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- Find By Role Id -->
+    <select id="findByRoleId" resultMap="UserRoleResultMap">
+        SELECT id, user_id, role_id, created_at
+        FROM user_role
+        WHERE role_id = #{roleId}
+    </select>
+
+    <!-- Find By User Id And Role Id -->
+    <select id="findByUserIdAndRoleId" resultMap="UserRoleResultMap">
+        SELECT id, user_id, role_id, created_at
+        FROM user_role
+        WHERE user_id = #{userId} AND role_id = #{roleId}
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="cn.wanyj.auth.entity.UserRole" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_role (user_id, role_id, created_at)
+        VALUES (#{userId}, #{roleId}, NOW())
+    </insert>
+
+    <!-- Delete By User Id And Role Id -->
+    <delete id="deleteByUserIdAndRoleId">
+        DELETE FROM user_role
+        WHERE user_id = #{userId} AND role_id = #{roleId}
+    </delete>
+
+    <!-- Delete By User Id -->
+    <delete id="deleteByUserId">
+        DELETE FROM user_role WHERE user_id = #{userId}
+    </delete>
+
+    <!-- Delete By Role Id -->
+    <delete id="deleteByRoleId">
+        DELETE FROM user_role WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- Count By User Id -->
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*) FROM user_role WHERE user_id = #{userId}
+    </select>
+
+    <!-- Count By Role Id -->
+    <select id="countByRoleId" resultType="long">
+        SELECT COUNT(*) FROM user_role WHERE role_id = #{roleId}
+    </select>
+
+</mapper>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.wanyj.auth.mapper.PermissionMapper">
+
+    <!-- Result Map -->
+    <resultMap id="PermissionResultMap" type="cn.wanyj.auth.entity.Permission">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="name" column="name"/>
+        <result property="resource" column="resource"/>
+        <result property="action" column="action"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- Find By Id -->
+    <select id="findById" resultMap="PermissionResultMap">
+        SELECT id, code, name, resource, action, description, created_at, updated_at
+        FROM permission
+        WHERE id = #{id}
+    </select>
+
+    <!-- Find By Code -->
+    <select id="findByCode" resultMap="PermissionResultMap">
+        SELECT id, code, name, resource, action, description, created_at, updated_at
+        FROM permission
+        WHERE code = #{code}
+    </select>
+
+    <!-- Find All -->
+    <select id="findAll" resultMap="PermissionResultMap">
+        SELECT id, code, name, resource, action, description, created_at, updated_at
+        FROM permission
+        ORDER BY id ASC
+    </select>
+
+    <!-- Find By Resource -->
+    <select id="findByResource" resultMap="PermissionResultMap">
+        SELECT id, code, name, resource, action, description, created_at, updated_at
+        FROM permission
+        WHERE resource = #{resource}
+        ORDER BY id ASC
+    </select>
+
+    <!-- Exists By Code -->
+    <select id="existsByCode" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM permission
+        WHERE code = #{code}
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="cn.wanyj.auth.entity.Permission" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO permission (code, name, resource, action, description, created_at, updated_at)
+        VALUES (#{code}, #{name}, #{resource}, #{action}, #{description}, NOW(), NOW())
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="cn.wanyj.auth.entity.Permission">
+        UPDATE permission
+        SET name = #{name},
+            resource = #{resource},
+            action = #{action},
+            description = #{description},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete By Id -->
+    <delete id="deleteById">
+        DELETE FROM permission WHERE id = #{id}
+    </delete>
+
+    <!-- Find By Role Id -->
+    <select id="findByRoleId" resultMap="PermissionResultMap">
+        SELECT p.id, p.code, p.name, p.resource, p.action, p.description, p.created_at, p.updated_at
+        FROM permission p
+        INNER JOIN role_permission rp ON p.id = rp.permission_id
+        WHERE rp.role_id = #{roleId}
+        ORDER BY p.id ASC
+    </select>
+
+    <!-- Count -->
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM permission
+    </select>
+
+</mapper>

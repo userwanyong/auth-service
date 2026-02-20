@@ -1,0 +1,66 @@
+server:
+  port: 8123
+
+spring:
+  application:
+    name: auth-service
+
+  # Database Configuration
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 12123
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: wanyj
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: cn.wanyj.auth.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# JWT Configuration
+jwt:
+  # Secret key for JWT signing (256-bit Base64 encoded)
+  # IMPORTANT: Keep this secret and don't commit to public repositories!
+  secret: Yo3bOIzQhkFc+lRvAEj90Hvx89IzgEC5FduXDPCTiB0=
+  access-token-expiration: 3600000    # 1 hour (milliseconds)
+  refresh-token-expiration: 604800000 # 7 days (milliseconds)
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    cn.wanyj.auth: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/auth-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

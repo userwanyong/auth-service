@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.wanyj.auth.mapper.RoleMapper">
+
+    <!-- Result Map -->
+    <resultMap id="RoleResultMap" type="cn.wanyj.auth.entity.Role">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- Result Map with Permissions -->
+    <resultMap id="RoleWithPermissionsResultMap" type="cn.wanyj.auth.entity.Role" extends="RoleResultMap">
+        <collection property="permissions" ofType="cn.wanyj.auth.entity.Permission">
+            <id property="id" column="permission_id"/>
+            <result property="code" column="permission_code"/>
+            <result property="name" column="permission_name"/>
+            <result property="resource" column="permission_resource"/>
+            <result property="action" column="permission_action"/>
+            <result property="description" column="permission_description"/>
+            <result property="createdAt" column="permission_created_at"/>
+            <result property="updatedAt" column="permission_updated_at"/>
+        </collection>
+    </resultMap>
+
+    <!-- Find By Id -->
+    <select id="findById" resultMap="RoleResultMap">
+        SELECT id, code, name, description, status, created_at, updated_at
+        FROM role
+        WHERE id = #{id}
+    </select>
+
+    <!-- Find By Code -->
+    <select id="findByCode" resultMap="RoleResultMap">
+        SELECT id, code, name, description, status, created_at, updated_at
+        FROM role
+        WHERE code = #{code}
+    </select>
+
+    <!-- Find All -->
+    <select id="findAll" resultMap="RoleResultMap">
+        SELECT id, code, name, description, status, created_at, updated_at
+        FROM role
+        ORDER BY id ASC
+    </select>
+
+    <!-- Find All With Permissions -->
+    <select id="findAllWithPermissions" resultMap="RoleWithPermissionsResultMap">
+        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
+               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+               p.resource AS permission_resource, p.action AS permission_action,
+               p.description AS permission_description,
+               p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
+        FROM role r
+        LEFT JOIN role_permission rp ON r.id = rp.role_id
+        LEFT JOIN permission p ON rp.permission_id = p.id
+        ORDER BY r.id ASC, p.id ASC
+    </select>
+
+    <!-- Exists By Code -->
+    <select id="existsByCode" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM role
+        WHERE code = #{code}
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="cn.wanyj.auth.entity.Role" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO role (code, name, description, status, created_at, updated_at)
+        VALUES (#{code}, #{name}, #{description}, #{status}, NOW(), NOW())
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="cn.wanyj.auth.entity.Role">
+        UPDATE role
+        SET name = #{name},
+            description = #{description},
+            status = #{status},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete By Id -->
+    <delete id="deleteById">
+        DELETE FROM role WHERE id = #{id}
+    </delete>
+
+    <!-- Find By User Id -->
+    <select id="findByUserId" resultMap="RoleResultMap">
+        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at
+        FROM role r
+        INNER JOIN user_role ur ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId}
+    </select>
+
+    <!-- Find By Id With Permissions -->
+    <select id="findByIdWithPermissions" resultMap="RoleWithPermissionsResultMap">
+        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
+               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+               p.resource AS permission_resource, p.action AS permission_action,
+               p.description AS permission_description,
+               p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
+        FROM role r
+        LEFT JOIN role_permission rp ON r.id = rp.role_id
+        LEFT JOIN permission p ON rp.permission_id = p.id
+        WHERE r.id = #{id}
+    </select>
+
+    <!-- Insert Role Permission -->
+    <insert id="insertRolePermission">
+        INSERT INTO role_permission (role_id, permission_id, created_at)
+        VALUES (#{roleId}, #{permissionId}, NOW())
+    </insert>
+
+    <!-- Delete Role Permissions By Role Id -->
+    <delete id="deleteRolePermissionsByRoleId">
+        DELETE FROM role_permission WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- Find Permission Ids By Role Id -->
+    <select id="findPermissionIdsByRoleId" resultType="long">
+        SELECT permission_id
+        FROM role_permission
+        WHERE role_id = #{roleId}
+    </select>
+
+    <!-- Count By Status -->
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*) FROM role WHERE status = #{status}
+    </select>
+
+</mapper>
