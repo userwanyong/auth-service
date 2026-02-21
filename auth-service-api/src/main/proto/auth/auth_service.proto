@@ -1,0 +1,138 @@
+// Protobuf IDL for Auth Service
+// Syntax version 3
+syntax = "proto3";
+
+// Package name for generated Java code
+option java_package = "cn.wanyj.auth.api.protobuf";
+option java_outer_classname = "AuthServiceProtos";
+option java_multiple_files = true;
+
+// ==================== Messages ====================
+
+// Login request
+message LoginRpcRequest {
+  string username = 1;
+  string password = 2;
+}
+
+// Authentication result
+message AuthResult {
+  bool success = 1;
+  string message = 2;
+  int64 userId = 3;
+  string username = 4;
+}
+
+// Token validation result
+message TokenValidationResult {
+  bool valid = 1;
+  int64 userId = 2;
+  string username = 3;
+  repeated string roles = 4;
+  repeated string permissions = 5;
+  int64 expiresAt = 6;
+}
+
+// User information response
+message UserRpcResponse {
+  int64 id = 1;
+  string username = 2;
+  string email = 3;
+  string phone = 4;
+  string nickname = 5;
+  string avatar = 6;
+  int32 status = 7;
+  repeated string roles = 8;
+  repeated string permissions = 9;
+}
+
+// Token response
+message TokenRpcResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+  int64 expiresIn = 3;
+}
+
+// Permission check request
+message PermissionCheckRequest {
+  int64 userId = 1;
+  string permission = 2;
+}
+
+// Role check request
+message RoleCheckRequest {
+  int64 userId = 1;
+  string role = 2;
+}
+
+// Token generation request
+message TokenGenerationRequest {
+  int64 userId = 1;
+  int64 expiration = 2;
+}
+
+// User permissions/roles response
+message StringListResponse {
+  repeated string values = 1;
+}
+
+// ==================== Services ====================
+
+// Authentication RPC Service (Protobuf IDL mode)
+service AuthRpcServiceProtobuf {
+  // Authenticate user credentials
+  rpc authenticate(LoginRpcRequest) returns (AuthResult);
+
+  // Validate access token
+  rpc validateToken(StringValue) returns (TokenValidationResult);
+
+  // Get user by ID
+  rpc getUserById(Int64Value) returns (UserRpcResponse);
+
+  // Get user by username
+  rpc getUserByUsername(StringValue) returns (UserRpcResponse);
+
+  // Check if user has permission
+  rpc hasPermission(PermissionCheckRequest) returns (BoolValue);
+
+  // Check if user has role
+  rpc hasRole(RoleCheckRequest) returns (BoolValue);
+
+  // Get user permissions
+  rpc getUserPermissions(Int64Value) returns (StringListResponse);
+
+  // Get user roles
+  rpc getUserRoles(Int64Value) returns (StringListResponse);
+}
+
+// Token RPC Service (Protobuf IDL mode)
+service TokenRpcServiceProtobuf {
+  // Generate token for user
+  rpc generateToken(TokenGenerationRequest) returns (TokenRpcResponse);
+
+  // Parse token to get user ID
+  rpc parseToken(StringValue) returns (Int64Value);
+
+  // Revoke all tokens for user
+  rpc revokeAllTokens(Int64Value) returns (Empty);
+}
+
+// ==================== Wrapper Types ====================
+
+// String wrapper
+message StringValue {
+  string value = 1;
+}
+
+// Int64 wrapper
+message Int64Value {
+  int64 value = 1;
+}
+
+// Bool wrapper
+message BoolValue {
+  bool value = 1;
+}
+
+// Empty response
+message Empty {}

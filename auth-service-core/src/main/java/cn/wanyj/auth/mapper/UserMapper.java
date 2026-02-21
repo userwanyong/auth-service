@@ -99,6 +99,12 @@ public interface UserMapper {
     User findByUsernameOrEmailWithRolesAndPermissions(@Param("identifier") String identifier);
 
     /**
+     * Find user with roles and permissions by username
+     * 根据用户名查找用户及其角色和权限信息
+     */
+    User findByUsernameWithRolesAndPermissions(@Param("username") String username);
+
+    /**
      * Insert user role
      * 插入用户角色关联
      */

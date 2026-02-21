@@ -78,7 +78,7 @@ dubbo:
   protocol:
     name: tri              # Triple protocol (Dubbo 3 default, based on HTTP/2)
     port: 20880           # RPC service port
-    serialization: json   # Serialization: json / protobuf / hessian
+    serialization: protobuf   # Serialization: json / protobuf / hessian
 
   # Registry configuration (Nacos)
   registry:
@@ -86,7 +86,7 @@ dubbo:
     username: nacos
     password: nacos
     parameters:
-      namespace: as
+      namespace:
 
   # Service provider configuration
   provider:
