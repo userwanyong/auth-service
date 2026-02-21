@@ -55,6 +55,8 @@ logging:
     cn.wanyj.auth: DEBUG
     org.springframework.security: INFO
     org.springframework.web: INFO
+    org.apache.dubbo: INFO
+    com.alibaba.nacos: INFO
   pattern:
 #    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -64,3 +66,41 @@ logging:
     rollingpolicy:
       max-file-size: 10MB
       max-history: 30
+
+# ========== Dubbo Configuration ==========
+dubbo:
+  application:
+    name: auth-service
+    version: 1.0.0
+    logger: slf4j
+
+  # Protocol configuration
+  protocol:
+    name: tri              # Triple protocol (Dubbo 3 default, based on HTTP/2)
+    port: 20880           # RPC service port
+    serialization: json   # Serialization: json / protobuf / hessian
+
+  # Registry configuration (Nacos)
+  registry:
+    address: nacos://localhost:8848
+    username: nacos
+    password: nacos
+    parameters:
+      namespace: as
+
+  # Service provider configuration
+  provider:
+    timeout: 5000
+    retries: 0
+    delay: 0              # Registration delay (seconds)
+    version: 1.0.0
+
+  # Metadata report configuration
+  metadata-report:
+    address: nacos://localhost:8848
+    username: nacos
+    password: nacos
+
+  # Scan RPC service packages
+  scan:
+    base-packages: cn.wanyj.auth.rpc

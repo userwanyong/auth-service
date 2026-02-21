@@ -31,5 +31,11 @@ build/
 ### VS Code ###
 .vscode/
 /.claude/
+
+### Logs ###
 /logs/
+**/logs/
+
+### Docs (keep design documents) ###
 /docs/mvp-design.md
+/docs/microservice-rpc-design.md
