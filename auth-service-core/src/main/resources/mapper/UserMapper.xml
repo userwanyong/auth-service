@@ -115,7 +115,8 @@
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
-        WHERE (username LIKE CONCAT('%', #{keyword}, '%')
+        WHERE tenant_id = #{tenantId}
+          AND (username LIKE CONCAT('%', #{keyword}, '%')
            OR email LIKE CONCAT('%', #{keyword}, '%'))
         ORDER BY created_at DESC
     </select>
@@ -124,8 +125,9 @@
     <select id="countByKeyword" resultType="long">
         SELECT COUNT(*)
         FROM user
-        WHERE username LIKE CONCAT('%', #{keyword}, '%')
-           OR email LIKE CONCAT('%', #{keyword}, '%')
+        WHERE tenant_id = #{tenantId}
+          AND (username LIKE CONCAT('%', #{keyword}, '%')
+           OR email LIKE CONCAT('%', #{keyword}, '%'))
     </select>
 
     <!-- Insert -->

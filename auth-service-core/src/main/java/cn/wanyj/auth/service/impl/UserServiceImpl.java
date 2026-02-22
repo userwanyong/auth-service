@@ -39,7 +39,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserById(Long id) {
-        User user = userMapper.findByIdWithRoles(id);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        User user = userMapper.findByIdWithRolesAndPermissions(id, tenantId);
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
@@ -68,12 +69,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public PageResponse<UserResponse> searchUsers(String keyword, Integer page, Integer size) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
         List<User> users;
         long total;
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            users = userMapper.findByKeyword(keyword);
-            total = userMapper.countByKeyword(keyword);
+            users = userMapper.findByKeyword(keyword, tenantId);
+            total = userMapper.countByKeyword(keyword, tenantId);
         } else {
             // For simplicity, returning all users with pagination done in code
             // In production, you should implement proper pagination in MyBatis

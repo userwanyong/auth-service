@@ -55,13 +55,13 @@ public interface UserMapper {
      * Find users by keyword (username or email) with pagination
      * 根据关键字搜索用户（分页）
      */
-    List<User> findByKeyword(@Param("keyword") String keyword);
+    List<User> findByKeyword(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
 
     /**
      * Count users by keyword
      * 统计用户数量
      */
-    long countByKeyword(@Param("keyword") String keyword);
+    long countByKeyword(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
 
     /**
      * Insert user
