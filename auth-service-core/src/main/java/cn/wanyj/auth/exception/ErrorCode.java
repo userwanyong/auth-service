@@ -33,6 +33,12 @@ public enum ErrorCode {
     INVALID_EMAIL_FORMAT(1013, "邮箱格式不正确"),
     INVALID_PHONE_FORMAT(1014, "手机号格式不正确"),
 
+    // Tenant errors - 租户错误
+    INVALID_TENANT(1015, "租户无效或不存在"),
+    TENANT_USER_LIMIT_REACHED(1016, "租户用户数量已达上限"),
+    TENANT_CODE_EXISTS(1017, "租户编码已存在"),
+    TENANT_NOT_FOUND(1018, "租户不存在"),
+
     // Authorization errors - 授权错误
     ACCESS_DENIED(2001, "无权限访问"),
     ROLE_NOT_FOUND(2002, "角色不存在"),

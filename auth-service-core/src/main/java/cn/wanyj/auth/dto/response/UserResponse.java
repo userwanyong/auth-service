@@ -30,17 +30,6 @@ public class UserResponse {
     private Boolean emailVerified;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
-    private Set<RoleInfo> roles;
+    private Set<String> roles;
     private Set<String> permissions;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class RoleInfo {
-        private Long id;
-        private String code;
-        private String name;
-    }
 }

@@ -1,5 +1,6 @@
 package cn.wanyj.auth.service.impl;
 
+import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.dto.response.PermissionResponse;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.exception.BusinessException;
@@ -30,7 +31,8 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<PermissionResponse> getAllPermissions() {
-        return permissionMapper.findAll().stream()
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return permissionMapper.findAll(tenantId).stream()
                 .map(this::mapToPermissionResponse)
                 .collect(Collectors.toList());
     }
@@ -46,14 +48,16 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public PermissionResponse createPermission(String code, String name, String resource, String action, String description) {
-        log.info("Creating new permission: {}", code);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        log.info("Creating new permission: {} in tenant: {}", code, tenantId);
 
         // Check if permission code already exists
-        if (permissionMapper.existsByCode(code)) {
+        if (permissionMapper.existsByCode(code, tenantId)) {
             throw new BusinessException(ErrorCode.PERMISSION_CODE_EXISTS);
         }
 
         Permission permission = Permission.builder()
+                .tenantId(tenantId)
                 .code(code)
                 .name(name)
                 .resource(resource)
@@ -63,7 +67,7 @@ public class PermissionServiceImpl implements PermissionService {
 
         permissionMapper.insert(permission);
 
-        log.info("Permission created successfully: {}", permission.getId());
+        log.info("Permission created successfully: {} in tenant: {}", permission.getId(), tenantId);
         return mapToPermissionResponse(permission);
     }
 

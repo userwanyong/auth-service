@@ -39,3 +39,4 @@ build/
 ### Docs (keep design documents) ###
 /docs/mvp-design.md
 /docs/microservice-rpc-design.md
+/docs/multi-tenant-design.md

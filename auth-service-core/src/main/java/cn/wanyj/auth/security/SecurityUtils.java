@@ -17,8 +17,33 @@ public class SecurityUtils {
     public static Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
+        if (authentication != null && authentication.getPrincipal() instanceof Object[]) {
+            Object[] principal = (Object[]) authentication.getPrincipal();
+            if (principal.length >= 1 && principal[0] instanceof Long) {
+                return (Long) principal[0];
+            }
+        }
+
+        // Fallback for old format (direct Long principal)
         if (authentication != null && authentication.getPrincipal() instanceof Long) {
             return (Long) authentication.getPrincipal();
+        }
+
+        return null;
+    }
+
+    /**
+     * Get current tenant ID from security context
+     * 从安全上下文中获取当前租户ID
+     */
+    public static Long getCurrentTenantId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication != null && authentication.getPrincipal() instanceof Object[]) {
+            Object[] principal = (Object[]) authentication.getPrincipal();
+            if (principal.length >= 2 && principal[1] instanceof Long) {
+                return (Long) principal[1];
+            }
         }
 
         return null;

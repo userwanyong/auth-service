@@ -6,6 +6,7 @@
     <!-- Result Map -->
     <resultMap id="UserResultMap" type="cn.wanyj.auth.entity.User">
         <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
         <result property="email" column="email"/>
@@ -23,6 +24,7 @@
     <resultMap id="UserWithRolesResultMap" type="cn.wanyj.auth.entity.User" extends="UserResultMap">
         <collection property="roles" ofType="cn.wanyj.auth.entity.Role">
             <id property="id" column="role_id"/>
+            <result property="tenantId" column="role_tenant_id"/>
             <result property="code" column="role_code"/>
             <result property="name" column="role_name"/>
             <result property="description" column="role_description"/>
@@ -36,6 +38,7 @@
     <resultMap id="UserWithRolesAndPermissionsResultMap" type="cn.wanyj.auth.entity.User" extends="UserResultMap">
         <collection property="roles" ofType="cn.wanyj.auth.entity.Role">
             <id property="id" column="role_id"/>
+            <result property="tenantId" column="role_tenant_id"/>
             <result property="code" column="role_code"/>
             <result property="name" column="role_name"/>
             <result property="description" column="role_description"/>
@@ -44,6 +47,7 @@
             <result property="updatedAt" column="role_updated_at"/>
             <collection property="permissions" ofType="cn.wanyj.auth.entity.Permission">
                 <id property="id" column="permission_id"/>
+                <result property="tenantId" column="permission_tenant_id"/>
                 <result property="code" column="permission_code"/>
                 <result property="name" column="permission_name"/>
                 <result property="resource" column="permission_resource"/>
@@ -57,57 +61,62 @@
 
     <!-- Find By Id -->
     <select id="findById" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, nickname, avatar,
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
         WHERE id = #{id}
     </select>
 
-    <!-- Find By Username -->
+    <!-- Find By Username And TenantId -->
     <select id="findByUsername" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, nickname, avatar,
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
         WHERE username = #{username}
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Find By Email -->
+    <!-- Find By Email And TenantId -->
     <select id="findByEmail" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, nickname, avatar,
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
         WHERE email = #{email}
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Find By Username Or Email -->
+    <!-- Find By Username Or Email And TenantId -->
     <select id="findByUsernameOrEmail" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, nickname, avatar,
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
-        WHERE username = #{identifier} OR email = #{identifier}
+        WHERE (username = #{identifier} OR email = #{identifier})
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Exists By Username -->
+    <!-- Exists By Username And TenantId -->
     <select id="existsByUsername" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM user
         WHERE username = #{username}
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Exists By Email -->
+    <!-- Exists By Email And TenantId -->
     <select id="existsByEmail" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM user
         WHERE email = #{email}
+          AND tenant_id = #{tenantId}
     </select>
 
     <!-- Find By Keyword -->
     <select id="findByKeyword" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, nickname, avatar,
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
                status, email_verified, last_login_at, created_at, updated_at
         FROM user
-        WHERE username LIKE CONCAT('%', #{keyword}, '%')
-           OR email LIKE CONCAT('%', #{keyword}, '%')
+        WHERE (username LIKE CONCAT('%', #{keyword}, '%')
+           OR email LIKE CONCAT('%', #{keyword}, '%'))
         ORDER BY created_at DESC
     </select>
 
@@ -121,16 +130,17 @@
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user (username, password, email, phone, nickname, avatar,
+        INSERT INTO user (tenant_id, username, password, email, phone, nickname, avatar,
                          status, email_verified, last_login_at, created_at, updated_at)
-        VALUES (#{username}, #{password}, #{email}, #{phone}, #{nickname}, #{avatar},
+        VALUES (#{tenantId}, #{username}, #{password}, #{email}, #{phone}, #{nickname}, #{avatar},
                 #{status}, #{emailVerified}, #{lastLoginAt}, NOW(), NOW())
     </insert>
 
     <!-- Update -->
     <update id="update" parameterType="cn.wanyj.auth.entity.User">
         UPDATE user
-        SET password = #{password},
+        SET tenant_id = #{tenantId},
+            password = #{password},
             email = #{email},
             phone = #{phone},
             nickname = #{nickname},
@@ -149,80 +159,84 @@
 
     <!-- Find By Id With Roles -->
     <select id="findByIdWithRoles" resultMap="UserWithRolesResultMap">
-        SELECT u.id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
+        SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
-               r.id AS role_id, r.code AS role_code, r.name AS role_name,
+               r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at
         FROM user u
-        LEFT JOIN user_role ur ON u.id = ur.user_id
-        LEFT JOIN role r ON ur.role_id = r.id
+        LEFT JOIN user_role ur ON u.id = ur.user_id AND u.tenant_id = ur.tenant_id
+        LEFT JOIN role r ON ur.role_id = r.id AND ur.tenant_id = r.tenant_id
         WHERE u.id = #{id}
     </select>
 
     <!-- Find By Id With Roles And Permissions -->
     <select id="findByIdWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
-        SELECT u.id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
+        SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
-               r.id AS role_id, r.code AS role_code, r.name AS role_name,
+               r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
-               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+               p.id AS permission_id, p.tenant_id AS permission_tenant_id, p.code AS permission_code, p.name AS permission_name,
                p.resource AS permission_resource, p.action AS permission_action,
                p.description AS permission_description,
                p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
         FROM user u
-        LEFT JOIN user_role ur ON u.id = ur.user_id
-        LEFT JOIN role r ON ur.role_id = r.id
-        LEFT JOIN role_permission rp ON r.id = rp.role_id
-        LEFT JOIN permission p ON rp.permission_id = p.id
+        LEFT JOIN user_role ur ON u.id = ur.user_id AND u.tenant_id = ur.tenant_id
+        LEFT JOIN role r ON ur.role_id = r.id AND ur.tenant_id = r.tenant_id
+        LEFT JOIN role_permission rp ON r.id = rp.role_id AND r.tenant_id = rp.tenant_id
+        LEFT JOIN permission p ON rp.permission_id = p.id AND rp.tenant_id = p.tenant_id
         WHERE u.id = #{id}
+          AND u.tenant_id = #{tenantId}
         ORDER BY r.id ASC, p.id ASC
     </select>
 
     <!-- Find By Username Or Email With Roles And Permissions -->
     <select id="findByUsernameOrEmailWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
-        SELECT u.id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
+        SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
-               r.id AS role_id, r.code AS role_code, r.name AS role_name,
+               r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
-               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+               p.id AS permission_id, p.tenant_id AS permission_tenant_id, p.code AS permission_code, p.name AS permission_name,
                p.resource AS permission_resource, p.action AS permission_action,
                p.description AS permission_description,
                p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
         FROM user u
-        LEFT JOIN user_role ur ON u.id = ur.user_id
-        LEFT JOIN role r ON ur.role_id = r.id
-        LEFT JOIN role_permission rp ON r.id = rp.role_id
-        LEFT JOIN permission p ON rp.permission_id = p.id
-        WHERE u.username = #{identifier} OR u.email = #{identifier}
+        LEFT JOIN user_role ur ON u.id = ur.user_id AND u.tenant_id = ur.tenant_id
+        LEFT JOIN role r ON ur.role_id = r.id AND ur.tenant_id = r.tenant_id
+        LEFT JOIN role_permission rp ON r.id = rp.role_id AND r.tenant_id = rp.tenant_id
+        LEFT JOIN permission p ON rp.permission_id = p.id AND rp.tenant_id = p.tenant_id
+        WHERE (u.username = #{identifier} OR u.email = #{identifier})
+          AND u.tenant_id = #{tenantId}
+        ORDER BY r.id ASC, p.id ASC
     </select>
 
     <!-- Find By Username With Roles And Permissions -->
     <select id="findByUsernameWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
-        SELECT u.id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
+        SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
-               r.id AS role_id, r.code AS role_code, r.name AS role_name,
+               r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
-               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+               p.id AS permission_id, p.tenant_id AS permission_tenant_id, p.code AS permission_code, p.name AS permission_name,
                p.resource AS permission_resource, p.action AS permission_action,
                p.description AS permission_description,
                p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
         FROM user u
-        LEFT JOIN user_role ur ON u.id = ur.user_id
-        LEFT JOIN role r ON ur.role_id = r.id
-        LEFT JOIN role_permission rp ON r.id = rp.role_id
-        LEFT JOIN permission p ON rp.permission_id = p.id
+        LEFT JOIN user_role ur ON u.id = ur.user_id AND u.tenant_id = ur.tenant_id
+        LEFT JOIN role r ON ur.role_id = r.id AND ur.tenant_id = r.tenant_id
+        LEFT JOIN role_permission rp ON r.id = rp.role_id AND r.tenant_id = rp.tenant_id
+        LEFT JOIN permission p ON rp.permission_id = p.id AND rp.tenant_id = p.tenant_id
         WHERE u.username = #{username}
+          AND u.tenant_id = #{tenantId}
         ORDER BY r.id ASC, p.id ASC
     </select>
 
     <!-- Insert User Role -->
     <insert id="insertUserRole">
-        INSERT INTO user_role (user_id, role_id, created_at)
-        VALUES (#{userId}, #{roleId}, NOW())
+        INSERT INTO user_role (user_id, role_id, tenant_id, created_at)
+        VALUES (#{userId}, #{roleId}, (SELECT tenant_id FROM user WHERE id = #{userId}), NOW())
     </insert>
 
     <!-- Delete User Roles By User Id -->
@@ -235,6 +249,14 @@
         SELECT role_id
         FROM user_role
         WHERE user_id = #{userId}
+    </select>
+
+    <!-- Find Role By Code And TenantId -->
+    <select id="findRoleByCodeAndTenantId" resultType="cn.wanyj.auth.entity.Role">
+        SELECT id, tenant_id, code, name, description, status, created_at, updated_at
+        FROM role
+        WHERE code = #{code}
+          AND tenant_id = #{tenantId}
     </select>
 
 </mapper>

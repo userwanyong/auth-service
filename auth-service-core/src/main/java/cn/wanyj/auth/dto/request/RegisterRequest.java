@@ -1,6 +1,7 @@
 package cn.wanyj.auth.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,12 @@ public class RegisterRequest {
     @NotBlank(message = "密码不能为空")
     @Size(min = 6, max = 50, message = "密码长度必须在6-50之间")
     private String password;
+
+    /**
+     * 租户ID - 必填，指定注册到哪个租户
+     */
+    @NotNull(message = "租户ID不能为空")
+    private Long tenantId;
 
     // 选填字段，在 Service 层手动校验
     private String email;

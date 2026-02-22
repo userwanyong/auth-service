@@ -1,5 +1,6 @@
 package cn.wanyj.auth.service.impl;
 
+import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
@@ -47,7 +48,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserByUsername(String username) {
-        User user = userMapper.findByUsername(username);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        User user = userMapper.findByUsername(username, tenantId);
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
@@ -161,12 +163,8 @@ public class UserServiceImpl implements UserService {
      * Map User entity to UserResponse DTO (with all details)
      */
     private UserResponse mapToUserResponse(User user) {
-        Set<UserResponse.RoleInfo> roles = user.getRoles().stream()
-                .map(role -> UserResponse.RoleInfo.builder()
-                        .id(role.getId())
-                        .code(role.getCode())
-                        .name(role.getName())
-                        .build())
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getCode)
                 .collect(Collectors.toSet());
 
         Set<String> permissions = user.getRoles().stream()

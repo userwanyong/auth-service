@@ -6,6 +6,7 @@
     <!-- Result Map -->
     <resultMap id="PermissionResultMap" type="cn.wanyj.auth.entity.Permission">
         <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="code" column="code"/>
         <result property="name" column="name"/>
         <result property="resource" column="resource"/>
@@ -17,50 +18,55 @@
 
     <!-- Find By Id -->
     <select id="findById" resultMap="PermissionResultMap">
-        SELECT id, code, name, resource, action, description, created_at, updated_at
+        SELECT id, tenant_id, code, name, resource, action, description, created_at, updated_at
         FROM permission
         WHERE id = #{id}
     </select>
 
-    <!-- Find By Code -->
+    <!-- Find By Code And TenantId -->
     <select id="findByCode" resultMap="PermissionResultMap">
-        SELECT id, code, name, resource, action, description, created_at, updated_at
+        SELECT id, tenant_id, code, name, resource, action, description, created_at, updated_at
         FROM permission
         WHERE code = #{code}
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Find All -->
+    <!-- Find All By TenantId -->
     <select id="findAll" resultMap="PermissionResultMap">
-        SELECT id, code, name, resource, action, description, created_at, updated_at
+        SELECT id, tenant_id, code, name, resource, action, description, created_at, updated_at
         FROM permission
+        WHERE tenant_id = #{tenantId}
         ORDER BY id ASC
     </select>
 
-    <!-- Find By Resource -->
+    <!-- Find By Resource And TenantId -->
     <select id="findByResource" resultMap="PermissionResultMap">
-        SELECT id, code, name, resource, action, description, created_at, updated_at
+        SELECT id, tenant_id, code, name, resource, action, description, created_at, updated_at
         FROM permission
         WHERE resource = #{resource}
+          AND tenant_id = #{tenantId}
         ORDER BY id ASC
     </select>
 
-    <!-- Exists By Code -->
+    <!-- Exists By Code And TenantId -->
     <select id="existsByCode" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM permission
         WHERE code = #{code}
+          AND tenant_id = #{tenantId}
     </select>
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.Permission" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO permission (code, name, resource, action, description, created_at, updated_at)
-        VALUES (#{code}, #{name}, #{resource}, #{action}, #{description}, NOW(), NOW())
+        INSERT INTO permission (tenant_id, code, name, resource, action, description, created_at, updated_at)
+        VALUES (#{tenantId}, #{code}, #{name}, #{resource}, #{action}, #{description}, NOW(), NOW())
     </insert>
 
     <!-- Update -->
     <update id="update" parameterType="cn.wanyj.auth.entity.Permission">
         UPDATE permission
-        SET name = #{name},
+        SET tenant_id = #{tenantId},
+            name = #{name},
             resource = #{resource},
             action = #{action},
             description = #{description},
@@ -75,9 +81,9 @@
 
     <!-- Find By Role Id -->
     <select id="findByRoleId" resultMap="PermissionResultMap">
-        SELECT p.id, p.code, p.name, p.resource, p.action, p.description, p.created_at, p.updated_at
+        SELECT p.id, p.tenant_id, p.code, p.name, p.resource, p.action, p.description, p.created_at, p.updated_at
         FROM permission p
-        INNER JOIN role_permission rp ON p.id = rp.permission_id
+        INNER JOIN role_permission rp ON p.id = rp.permission_id AND p.tenant_id = rp.tenant_id
         WHERE rp.role_id = #{roleId}
         ORDER BY p.id ASC
     </select>

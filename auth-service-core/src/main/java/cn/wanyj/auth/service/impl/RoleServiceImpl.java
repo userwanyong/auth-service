@@ -1,5 +1,6 @@
 package cn.wanyj.auth.service.impl;
 
+import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.dto.request.AssignPermissionsRequest;
 import cn.wanyj.auth.dto.response.RoleResponse;
 import cn.wanyj.auth.entity.Permission;
@@ -36,7 +37,8 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public List<RoleResponse> getAllRoles() {
-        return roleMapper.findAllWithPermissions().stream()
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return roleMapper.findAllWithPermissions(tenantId).stream()
                 .map(this::mapToRoleResponse)
                 .collect(Collectors.toList());
     }
@@ -52,7 +54,8 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public RoleResponse getRoleByCode(String code) {
-        Role role = roleMapper.findByCode(code);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        Role role = roleMapper.findByCode(code, tenantId);
         if (role == null) {
             throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
         }
@@ -72,14 +75,16 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public RoleResponse createRole(String code, String name, String description) {
-        log.info("Creating new role: {}", code);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        log.info("Creating new role: {} in tenant: {}", code, tenantId);
 
         // Check if role code already exists
-        if (roleMapper.existsByCode(code)) {
+        if (roleMapper.existsByCode(code, tenantId)) {
             throw new BusinessException(ErrorCode.ROLE_CODE_EXISTS);
         }
 
         Role role = Role.builder()
+                .tenantId(tenantId)
                 .code(code)
                 .name(name)
                 .description(description)
@@ -89,7 +94,7 @@ public class RoleServiceImpl implements RoleService {
 
         roleMapper.insert(role);
 
-        log.info("Role created successfully: {}", role.getId());
+        log.info("Role created successfully: {} in tenant: {}", role.getId(), tenantId);
         return mapToRoleResponse(role);
     }
 

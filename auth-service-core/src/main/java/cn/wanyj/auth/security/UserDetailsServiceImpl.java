@@ -1,5 +1,6 @@
 package cn.wanyj.auth.security;
 
+import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.entity.Role;
 import cn.wanyj.auth.entity.User;
@@ -35,8 +36,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.info("Loading user by username: {}", username);
 
+        // Get tenant ID from JWT token
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
         // Load user with roles and permissions from database
-        User user = userMapper.findByUsernameOrEmailWithRolesAndPermissions(username);
+        User user = userMapper.findByUsernameOrEmailWithRolesAndPermissions(username, tenantId);
 
         if (user == null) {
             log.error("User not found: {}", username);

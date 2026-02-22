@@ -29,17 +29,17 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * User registration
-     * 用户注册
+     * User registration (auto-login)
+     * 用户注册并自动登录
      * POST /api/auth/register
      */
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<TokenResponse>> register(@Valid @RequestBody RegisterRequest request) {
         log.info("Registration request for username: {}", request.getUsername());
-        UserResponse user = authService.register(request);
+        TokenResponse token = authService.register(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(201, "注册成功", user));
+                .body(ApiResponse.success(201, "注册成功", token));
     }
 
     /**

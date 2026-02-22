@@ -20,28 +20,28 @@ public interface RoleMapper {
     Role findById(@Param("id") Long id);
 
     /**
-     * Find role by code
-     * 根据角色编码查找角色
+     * Find role by code and tenant id
+     * 根据角色编码和租户ID查找角色
      */
-    Role findByCode(@Param("code") String code);
+    Role findByCode(@Param("code") String code, @Param("tenantId") Long tenantId);
 
     /**
-     * Find all roles
-     * 查找所有角色
+     * Find all roles by tenant id
+     * 根据租户ID查找所有角色
      */
-    List<Role> findAll();
+    List<Role> findAll(@Param("tenantId") Long tenantId);
 
     /**
-     * Find all roles with permissions
-     * 查找所有角色及其权限信息
+     * Find all roles with permissions by tenant id
+     * 根据租户ID查找所有角色及其权限信息
      */
-    List<Role> findAllWithPermissions();
+    List<Role> findAllWithPermissions(@Param("tenantId") Long tenantId);
 
     /**
-     * Check if role code exists
-     * 检查角色编码是否存在
+     * Check if role code exists in tenant
+     * 检查角色编码在租户内是否存在
      */
-    boolean existsByCode(@Param("code") String code);
+    boolean existsByCode(@Param("code") String code, @Param("tenantId") Long tenantId);
 
     /**
      * Insert role

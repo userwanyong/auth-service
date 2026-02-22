@@ -6,6 +6,7 @@
     <!-- Result Map -->
     <resultMap id="RoleResultMap" type="cn.wanyj.auth.entity.Role">
         <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="code" column="code"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
@@ -18,6 +19,7 @@
     <resultMap id="RoleWithPermissionsResultMap" type="cn.wanyj.auth.entity.Role" extends="RoleResultMap">
         <collection property="permissions" ofType="cn.wanyj.auth.entity.Permission">
             <id property="id" column="permission_id"/>
+            <result property="tenantId" column="permission_tenant_id"/>
             <result property="code" column="permission_code"/>
             <result property="name" column="permission_name"/>
             <result property="resource" column="permission_resource"/>
@@ -30,55 +32,60 @@
 
     <!-- Find By Id -->
     <select id="findById" resultMap="RoleResultMap">
-        SELECT id, code, name, description, status, created_at, updated_at
+        SELECT id, tenant_id, code, name, description, status, created_at, updated_at
         FROM role
         WHERE id = #{id}
     </select>
 
-    <!-- Find By Code -->
+    <!-- Find By Code And TenantId -->
     <select id="findByCode" resultMap="RoleResultMap">
-        SELECT id, code, name, description, status, created_at, updated_at
+        SELECT id, tenant_id, code, name, description, status, created_at, updated_at
         FROM role
         WHERE code = #{code}
+          AND tenant_id = #{tenantId}
     </select>
 
-    <!-- Find All -->
+    <!-- Find All By TenantId -->
     <select id="findAll" resultMap="RoleResultMap">
-        SELECT id, code, name, description, status, created_at, updated_at
+        SELECT id, tenant_id, code, name, description, status, created_at, updated_at
         FROM role
+        WHERE tenant_id = #{tenantId}
         ORDER BY id ASC
     </select>
 
-    <!-- Find All With Permissions -->
+    <!-- Find All With Permissions By TenantId -->
     <select id="findAllWithPermissions" resultMap="RoleWithPermissionsResultMap">
-        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
-               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+        SELECT r.id, r.tenant_id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
+               p.id AS permission_id, p.tenant_id AS permission_tenant_id, p.code AS permission_code, p.name AS permission_name,
                p.resource AS permission_resource, p.action AS permission_action,
                p.description AS permission_description,
                p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
         FROM role r
-        LEFT JOIN role_permission rp ON r.id = rp.role_id
-        LEFT JOIN permission p ON rp.permission_id = p.id
+        LEFT JOIN role_permission rp ON r.id = rp.role_id AND r.tenant_id = rp.tenant_id
+        LEFT JOIN permission p ON rp.permission_id = p.id AND rp.tenant_id = p.tenant_id
+        WHERE r.tenant_id = #{tenantId}
         ORDER BY r.id ASC, p.id ASC
     </select>
 
-    <!-- Exists By Code -->
+    <!-- Exists By Code And TenantId -->
     <select id="existsByCode" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM role
         WHERE code = #{code}
+          AND tenant_id = #{tenantId}
     </select>
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.Role" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO role (code, name, description, status, created_at, updated_at)
-        VALUES (#{code}, #{name}, #{description}, #{status}, NOW(), NOW())
+        INSERT INTO role (tenant_id, code, name, description, status, created_at, updated_at)
+        VALUES (#{tenantId}, #{code}, #{name}, #{description}, #{status}, NOW(), NOW())
     </insert>
 
     <!-- Update -->
     <update id="update" parameterType="cn.wanyj.auth.entity.Role">
         UPDATE role
-        SET name = #{name},
+        SET tenant_id = #{tenantId},
+            name = #{name},
             description = #{description},
             status = #{status},
             updated_at = NOW()
@@ -92,29 +99,29 @@
 
     <!-- Find By User Id -->
     <select id="findByUserId" resultMap="RoleResultMap">
-        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at
+        SELECT r.id, r.tenant_id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at
         FROM role r
-        INNER JOIN user_role ur ON r.id = ur.role_id
+        INNER JOIN user_role ur ON r.id = ur.role_id AND r.tenant_id = ur.tenant_id
         WHERE ur.user_id = #{userId}
     </select>
 
     <!-- Find By Id With Permissions -->
     <select id="findByIdWithPermissions" resultMap="RoleWithPermissionsResultMap">
-        SELECT r.id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
-               p.id AS permission_id, p.code AS permission_code, p.name AS permission_name,
+        SELECT r.id, r.tenant_id, r.code, r.name, r.description, r.status, r.created_at, r.updated_at,
+               p.id AS permission_id, p.tenant_id AS permission_tenant_id, p.code AS permission_code, p.name AS permission_name,
                p.resource AS permission_resource, p.action AS permission_action,
                p.description AS permission_description,
                p.created_at AS permission_created_at, p.updated_at AS permission_updated_at
         FROM role r
-        LEFT JOIN role_permission rp ON r.id = rp.role_id
-        LEFT JOIN permission p ON rp.permission_id = p.id
+        LEFT JOIN role_permission rp ON r.id = rp.role_id AND r.tenant_id = rp.tenant_id
+        LEFT JOIN permission p ON rp.permission_id = p.id AND rp.tenant_id = p.tenant_id
         WHERE r.id = #{id}
     </select>
 
     <!-- Insert Role Permission -->
     <insert id="insertRolePermission">
-        INSERT INTO role_permission (role_id, permission_id, created_at)
-        VALUES (#{roleId}, #{permissionId}, NOW())
+        INSERT INTO role_permission (role_id, permission_id, tenant_id, created_at)
+        VALUES (#{roleId}, #{permissionId}, (SELECT tenant_id FROM role WHERE id = #{roleId}), NOW())
     </insert>
 
     <!-- Delete Role Permissions By Role Id -->
@@ -129,7 +136,7 @@
         WHERE role_id = #{roleId}
     </select>
 
-    <!-- Count By Status -->
+    <!-- Count By Status And TenantId -->
     <select id="countByStatus" resultType="long">
         SELECT COUNT(*) FROM role WHERE status = #{status}
     </select>

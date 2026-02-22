@@ -13,10 +13,10 @@ import cn.wanyj.auth.dto.response.UserResponse;
 public interface AuthService {
 
     /**
-     * Register new user
-     * 用户注册
+     * Register new user and auto-login
+     * 用户注册并自动登录
      */
-    UserResponse register(RegisterRequest request);
+    TokenResponse register(RegisterRequest request);
 
     /**
      * User login

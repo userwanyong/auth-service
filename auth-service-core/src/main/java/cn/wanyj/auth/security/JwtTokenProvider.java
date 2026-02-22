@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -70,6 +69,7 @@ public class JwtTokenProvider {
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
                 .claim("email", user.getEmail())
+                .claim("tenant_id", user.getTenantId())
                 .claim("roles", roles)
                 .claim("permissions", permissions)
                 .issuedAt(now)
@@ -89,6 +89,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("type", "refresh")
+                .claim("tenant_id", user.getTenantId())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -185,5 +186,19 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    /**
+     * Get tenant ID from token
+     * 从令牌中获取租户ID
+     */
+    public Long getTenantIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("tenant_id", Long.class);
     }
 }

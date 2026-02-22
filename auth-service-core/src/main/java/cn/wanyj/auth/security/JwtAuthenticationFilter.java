@@ -2,6 +2,7 @@ package cn.wanyj.auth.security;
 
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.service.TokenService;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -19,12 +22,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import io.jsonwebtoken.Claims;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * JWT Authentication Filter - JWT认证过滤器
@@ -67,15 +64,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             TokenValidationResult result = validateToken(token);
 
             if (result.isValid()) {
+                // Get claims from token to extract tenant_id, user roles and permissions
+                Claims claims = jwtTokenProvider.getClaimsFromToken(token);
+                Long tenantId = claims.get("tenant_id", Long.class);
+                Long userId = Long.parseLong(claims.getSubject());
+
                 // Check if token is blacklisted
-                if (tokenService.isBlacklisted(token)) {
-                    log.warn("Token is blacklisted: {}...", token.substring(0, Math.min(20, token.length())));
+                if (tokenService.isBlacklisted(tenantId, token)) {
+                    log.warn("Token is blacklisted: tenant={}, token:{}...", tenantId, token.substring(0, Math.min(20, token.length())));
                     request.setAttribute(TOKEN_ERROR_ATTRIBUTE, ErrorCode.TOKEN_BLACKLISTED);
                 } else {
-                    // Get claims from token to extract user roles and permissions
-                    Claims claims = jwtTokenProvider.getClaimsFromToken(token);
-                    Long userId = Long.parseLong(claims.getSubject());
-
                     // Extract roles and permissions from JWT claims
                     // Note: JWT stores these as List, not Set
                     List<String> roles = claims.get("roles", List.class);
@@ -90,14 +88,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         permissions.forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
                     }
 
-                    // Create authentication object with user ID and authorities
+                    // Create authentication object with user ID, tenant ID and authorities
+                    // Store both userId and tenantId in the principal using an array
                     UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                            new UsernamePasswordAuthenticationToken(
+                                    new Object[]{userId, tenantId}, // principal: [userId, tenantId]
+                                    null,
+                                    authorities
+                            );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    log.debug("Set authentication for user ID: {} with {} authorities: {}", userId, authorities.size(), authorities);
+                    log.debug("Set authentication for user ID: {}, tenant ID: {} with {} authorities",
+                            userId, tenantId, authorities.size());
                 }
             } else {
                 // Store error in request attribute for AuthenticationEntryPoint

@@ -32,6 +32,7 @@ public class TokenResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class UserInfo {
         private Long id;
+        private Long tenantId;
         private String username;
         private String email;
         private String nickname;

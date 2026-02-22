@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.wanyj.auth.mapper.TenantMapper">
+
+    <!-- Result Map -->
+    <resultMap id="TenantResultMap" type="cn.wanyj.auth.entity.Tenant">
+        <id property="id" column="id"/>
+        <result property="tenantCode" column="tenant_code"/>
+        <result property="tenantName" column="tenant_name"/>
+        <result property="status" column="status"/>
+        <result property="expiredAt" column="expired_at"/>
+        <result property="maxUsers" column="max_users"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- Find By Id -->
+    <select id="findById" resultMap="TenantResultMap">
+        SELECT id, tenant_code, tenant_name, status, expired_at,
+               max_users, created_at, updated_at
+        FROM tenant
+        WHERE id = #{id}
+    </select>
+
+    <!-- Find By Code -->
+    <select id="findByCode" resultMap="TenantResultMap">
+        SELECT id, tenant_code, tenant_name, status, expired_at,
+               max_users, created_at, updated_at
+        FROM tenant
+        WHERE tenant_code = #{tenantCode}
+    </select>
+
+    <!-- Find All -->
+    <select id="findAll" resultMap="TenantResultMap">
+        SELECT id, tenant_code, tenant_name, status, expired_at,
+               max_users, created_at, updated_at
+        FROM tenant
+        ORDER BY id
+    </select>
+
+    <!-- Exists By Code -->
+    <select id="existsByCode" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM tenant
+        WHERE tenant_code = #{tenantCode}
+    </select>
+
+    <!-- Insert -->
+    <insert id="insert" parameterType="cn.wanyj.auth.entity.Tenant" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tenant (tenant_code, tenant_name, status, expired_at, max_users)
+        VALUES (#{tenantCode}, #{tenantName}, #{status}, #{expiredAt}, #{maxUsers})
+    </insert>
+
+    <!-- Update -->
+    <update id="update" parameterType="cn.wanyj.auth.entity.Tenant">
+        UPDATE tenant
+        SET tenant_name = #{tenantName},
+            status = #{status},
+            expired_at = #{expiredAt},
+            max_users = #{maxUsers},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete By Id -->
+    <delete id="deleteById">
+        DELETE FROM tenant WHERE id = #{id}
+    </delete>
+
+    <!-- Count Users By Tenant Id -->
+    <select id="countUsersByTenantId" resultType="long">
+        SELECT COUNT(*)
+        FROM user
+        WHERE tenant_id = #{tenantId}
+    </select>
+
+</mapper>

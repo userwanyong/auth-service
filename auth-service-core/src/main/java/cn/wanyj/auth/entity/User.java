@@ -21,6 +21,11 @@ public class User {
 
     private Long id;
 
+    /**
+     * 租户ID
+     */
+    private Long tenantId;
+
     private String username;
 
     private String password;

@@ -21,6 +21,11 @@ public class Role {
 
     private Long id;
 
+    /**
+     * 租户ID
+     */
+    private Long tenantId;
+
     private String code;
 
     private String name;

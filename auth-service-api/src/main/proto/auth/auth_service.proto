@@ -13,6 +13,7 @@ option java_multiple_files = true;
 message LoginRpcRequest {
   string username = 1;
   string password = 2;
+  int64 tenantId = 3;  // Tenant ID for multi-tenant support
 }
 
 // Authentication result
@@ -31,6 +32,7 @@ message TokenValidationResult {
   repeated string roles = 4;
   repeated string permissions = 5;
   int64 expiresAt = 6;
+  int64 tenantId = 7;  // Tenant ID from token
 }
 
 // User information response
@@ -57,18 +59,45 @@ message TokenRpcResponse {
 message PermissionCheckRequest {
   int64 userId = 1;
   string permission = 2;
+  int64 tenantId = 3;  // Tenant ID for multi-tenant support
 }
 
 // Role check request
 message RoleCheckRequest {
   int64 userId = 1;
   string role = 2;
+  int64 tenantId = 3;  // Tenant ID for multi-tenant support
+}
+
+// User by ID request
+message UserByIdRequest {
+  int64 userId = 1;
+  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+}
+
+// User by username request
+message UserByUsernameRequest {
+  string username = 1;
+  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+}
+
+// User permissions request
+message UserPermissionsRequest {
+  int64 userId = 1;
+  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+}
+
+// User roles request
+message UserRolesRequest {
+  int64 userId = 1;
+  int64 tenantId = 2;  // Tenant ID for multi-tenant support
 }
 
 // Token generation request
 message TokenGenerationRequest {
   int64 userId = 1;
   int64 expiration = 2;
+  int64 tenantId = 3;  // Tenant ID for multi-tenant support
 }
 
 // User permissions/roles response
@@ -80,17 +109,14 @@ message StringListResponse {
 
 // Authentication RPC Service (Protobuf IDL mode)
 service AuthRpcServiceProtobuf {
-  // Authenticate user credentials
+  // Authenticate user credentials (login through HTTP, not recommended for RPC)
   rpc authenticate(LoginRpcRequest) returns (AuthResult);
 
-  // Validate access token
-  rpc validateToken(StringValue) returns (TokenValidationResult);
-
   // Get user by ID
-  rpc getUserById(Int64Value) returns (UserRpcResponse);
+  rpc getUserById(UserByIdRequest) returns (UserRpcResponse);
 
   // Get user by username
-  rpc getUserByUsername(StringValue) returns (UserRpcResponse);
+  rpc getUserByUsername(UserByUsernameRequest) returns (UserRpcResponse);
 
   // Check if user has permission
   rpc hasPermission(PermissionCheckRequest) returns (BoolValue);
@@ -99,10 +125,10 @@ service AuthRpcServiceProtobuf {
   rpc hasRole(RoleCheckRequest) returns (BoolValue);
 
   // Get user permissions
-  rpc getUserPermissions(Int64Value) returns (StringListResponse);
+  rpc getUserPermissions(UserPermissionsRequest) returns (StringListResponse);
 
   // Get user roles
-  rpc getUserRoles(Int64Value) returns (StringListResponse);
+  rpc getUserRoles(UserRolesRequest) returns (StringListResponse);
 }
 
 // Token RPC Service (Protobuf IDL mode)
@@ -110,8 +136,8 @@ service TokenRpcServiceProtobuf {
   // Generate token for user
   rpc generateToken(TokenGenerationRequest) returns (TokenRpcResponse);
 
-  // Parse token to get user ID
-  rpc parseToken(StringValue) returns (Int64Value);
+  // Parse token to get complete user information
+  rpc parseToken(StringValue) returns (TokenValidationResult);
 
   // Revoke all tokens for user
   rpc revokeAllTokens(Int64Value) returns (Empty);

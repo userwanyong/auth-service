@@ -20,28 +20,28 @@ public interface PermissionMapper {
     Permission findById(@Param("id") Long id);
 
     /**
-     * Find permission by code
-     * 根据权限编码查找权限
+     * Find permission by code and tenant id
+     * 根据权限编码和租户ID查找权限
      */
-    Permission findByCode(@Param("code") String code);
+    Permission findByCode(@Param("code") String code, @Param("tenantId") Long tenantId);
 
     /**
-     * Find all permissions
-     * 查找所有权限
+     * Find all permissions by tenant id
+     * 根据租户ID查找所有权限
      */
-    List<Permission> findAll();
+    List<Permission> findAll(@Param("tenantId") Long tenantId);
 
     /**
-     * Find permissions by resource
-     * 根据资源查找权限
+     * Find permissions by resource and tenant id
+     * 根据资源和租户ID查找权限
      */
-    List<Permission> findByResource(@Param("resource") String resource);
+    List<Permission> findByResource(@Param("resource") String resource, @Param("tenantId") Long tenantId);
 
     /**
-     * Check if permission code exists
-     * 检查权限编码是否存在
+     * Check if permission code exists in tenant
+     * 检查权限编码在租户内是否存在
      */
-    boolean existsByCode(@Param("code") String code);
+    boolean existsByCode(@Param("code") String code, @Param("tenantId") Long tenantId);
 
     /**
      * Insert permission

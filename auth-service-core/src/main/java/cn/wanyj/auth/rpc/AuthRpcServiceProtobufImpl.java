@@ -38,12 +38,13 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public AuthResult authenticate(LoginRpcRequest request) {
-        log.info("RPC authenticate: username={}", request.getUsername());
+        log.info("RPC authenticate: username={}, tenantId={}", request.getUsername(), request.getTenantId());
         try {
             TokenResponse tokenResponse = authService.login(
                 LoginRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
+                    .tenantId(request.getTenantId())
                     .build()
             );
 
@@ -69,94 +70,70 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     }
 
     @Override
-    public TokenValidationResult validateToken(StringValue token) {
-        log.info("RPC validateToken");
+    public UserRpcResponse getUserById(UserByIdRequest request) {
+        log.info("RPC getUserById: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
-            String tokenValue = token.getValue();
-
-            if (tokenService.isBlacklisted(tokenValue)) {
-                return TokenValidationResult.newBuilder()
-                    .setValid(false)
-                    .build();
-            }
-
-            if (!jwtTokenProvider.validateAccessToken(tokenValue)) {
-                return TokenValidationResult.newBuilder()
-                    .setValid(false)
-                    .build();
-            }
-
-            Long userId = jwtTokenProvider.getUserIdFromToken(tokenValue);
-            // Use findByIdWithRolesAndPermissions to load permissions
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(userId);
+            // Load user with roles and permissions using provided tenantId
+            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
+                request.getUserId(),
+                request.getTenantId()
+            );
 
             if (user == null || user.getStatus() == 0) {
-                return TokenValidationResult.newBuilder()
-                    .setValid(false)
-                    .build();
+                log.warn("User not found or disabled: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                return UserRpcResponse.getDefaultInstance();
             }
 
-            long expiresAt = jwtTokenProvider.getAccessTokenExpirationSeconds() * 1000 + System.currentTimeMillis();
+            // Verify user belongs to the specified tenant
+            if (!user.getTenantId().equals(request.getTenantId())) {
+                log.warn("User {} does not belong to tenant {}", request.getUserId(), request.getTenantId());
+                return UserRpcResponse.getDefaultInstance();
+            }
 
-            return TokenValidationResult.newBuilder()
-                .setValid(true)
-                .setUserId(user.getId())
-                .setUsername(user.getUsername())
-                .addAllRoles(user.getRoles().stream()
-                    .map(r -> r.getCode())
-                    .collect(Collectors.toList()))
-                .addAllPermissions(user.getRoles().stream()
-                    .flatMap(r -> r.getPermissions().stream())
-                    .map(p -> p.getCode())
-                    .distinct()
-                    .collect(Collectors.toList()))
-                .setExpiresAt(expiresAt)
-                .build();
+            return convertToProtobuf(user);
         } catch (Exception e) {
-            log.error("Token validation error", e);
-            return TokenValidationResult.newBuilder()
-                .setValid(false)
-                .build();
+            log.error("Failed to get user by id: userId={}, tenantId={}",
+                request.getUserId(), request.getTenantId(), e);
+            return UserRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
-    public UserRpcResponse getUserById(Int64Value userId) {
-        log.info("RPC getUserById: userId={}", userId.getValue());
+    public UserRpcResponse getUserByUsername(UserByUsernameRequest request) {
+        log.info("RPC getUserByUsername: username={}, tenantId={}",
+            request.getUsername(), request.getTenantId());
         try {
-            UserResponse user = authService.getCurrentUser(userId.getValue());
-            if (user == null) {
-                return null;
-            }
-            return convertToProtobuf(user);
-        } catch (Exception e) {
-            log.error("Failed to get user by id: {}", userId.getValue(), e);
-            return null;
-        }
-    }
+            // Load user with roles and permissions using username and tenantId
+            cn.wanyj.auth.entity.User user = userMapper.findByUsernameWithRolesAndPermissions(
+                request.getUsername(),
+                request.getTenantId()
+            );
 
-    @Override
-    public UserRpcResponse getUserByUsername(StringValue username) {
-        log.info("RPC getUserByUsername: username={}", username.getValue());
-        try {
-            // Use findByUsernameWithRolesAndPermissions to load roles and permissions
-            cn.wanyj.auth.entity.User user = userMapper.findByUsernameWithRolesAndPermissions(username.getValue());
             if (user == null || user.getStatus() == 0) {
-                return null;
+                log.warn("User not found or disabled: username={}, tenantId={}",
+                    request.getUsername(), request.getTenantId());
+                return UserRpcResponse.getDefaultInstance();
             }
+
             return convertToProtobuf(user);
         } catch (Exception e) {
-            log.error("Failed to get user by username: {}", username.getValue(), e);
-            return null;
+            log.error("Failed to get user by username: username={}, tenantId={}",
+                request.getUsername(), request.getTenantId(), e);
+            return UserRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
     public BoolValue hasPermission(PermissionCheckRequest request) {
-        log.info("RPC hasPermission: userId={}, permission={}", request.getUserId(), request.getPermission());
+        log.info("RPC hasPermission: userId={}, permission={}, tenantId={}",
+            request.getUserId(), request.getPermission(), request.getTenantId());
         try {
-            // Use findByIdWithRolesAndPermissions to load permissions
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(request.getUserId());
+            // Use tenantId from request
+            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
+                request.getUserId(),
+                request.getTenantId()
+            );
+
             if (user == null || user.getStatus() == 0) {
                 return BoolValue.newBuilder().setValue(false).build();
             }
@@ -174,9 +151,15 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public BoolValue hasRole(RoleCheckRequest request) {
-        log.info("RPC hasRole: userId={}, role={}", request.getUserId(), request.getRole());
+        log.info("RPC hasRole: userId={}, role={}, tenantId={}",
+            request.getUserId(), request.getRole(), request.getTenantId());
         try {
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRoles(request.getUserId());
+            // Use tenantId from request
+            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
+                request.getUserId(),
+                request.getTenantId()
+            );
+
             if (user == null || user.getStatus() == 0) {
                 return BoolValue.newBuilder().setValue(false).build();
             }
@@ -192,13 +175,18 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     }
 
     @Override
-    public StringListResponse getUserPermissions(Int64Value userId) {
-        log.info("RPC getUserPermissions: userId={}", userId.getValue());
+    public StringListResponse getUserPermissions(UserPermissionsRequest request) {
+        log.info("RPC getUserPermissions: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
-            // Use findByIdWithRolesAndPermissions to load permissions
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(userId.getValue());
+            // Use tenantId from request
+            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
+                request.getUserId(),
+                request.getTenantId()
+            );
+
             if (user == null) {
-                return StringListResponse.newBuilder().build();
+                log.warn("User not found: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                return StringListResponse.getDefaultInstance();
             }
 
             return StringListResponse.newBuilder()
@@ -210,17 +198,23 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 .build();
         } catch (Exception e) {
             log.error("Failed to get user permissions", e);
-            return StringListResponse.newBuilder().build();
+            return StringListResponse.getDefaultInstance();
         }
     }
 
     @Override
-    public StringListResponse getUserRoles(Int64Value userId) {
-        log.info("RPC getUserRoles: userId={}", userId.getValue());
+    public StringListResponse getUserRoles(UserRolesRequest request) {
+        log.info("RPC getUserRoles: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRoles(userId.getValue());
+            // Use tenantId from request
+            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
+                request.getUserId(),
+                request.getTenantId()
+            );
+
             if (user == null) {
-                return StringListResponse.newBuilder().build();
+                log.warn("User not found: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                return StringListResponse.getDefaultInstance();
             }
 
             return StringListResponse.newBuilder()
@@ -230,7 +224,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 .build();
         } catch (Exception e) {
             log.error("Failed to get user roles", e);
-            return StringListResponse.newBuilder().build();
+            return StringListResponse.getDefaultInstance();
         }
     }
 
@@ -244,7 +238,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
             .setAvatar(user.getAvatar() != null ? user.getAvatar() : "")
             .setStatus(user.getStatus())
             .addAllRoles(user.getRoles() != null
-                ? user.getRoles().stream().map(UserResponse.RoleInfo::getCode).collect(Collectors.toList())
+                ? user.getRoles()
                 : java.util.Collections.emptyList())
             .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : java.util.Collections.emptyList())
             .build();
