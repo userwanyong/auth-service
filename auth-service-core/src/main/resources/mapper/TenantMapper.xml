@@ -11,6 +11,7 @@
         <result property="status" column="status"/>
         <result property="expiredAt" column="expired_at"/>
         <result property="maxUsers" column="max_users"/>
+        <result property="isPlatform" column="is_platform"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -18,7 +19,7 @@
     <!-- Find By Id -->
     <select id="findById" resultMap="TenantResultMap">
         SELECT id, tenant_code, tenant_name, status, expired_at,
-               max_users, created_at, updated_at
+               max_users, is_platform, created_at, updated_at
         FROM tenant
         WHERE id = #{id}
     </select>
@@ -26,7 +27,7 @@
     <!-- Find By Code -->
     <select id="findByCode" resultMap="TenantResultMap">
         SELECT id, tenant_code, tenant_name, status, expired_at,
-               max_users, created_at, updated_at
+               max_users, is_platform, created_at, updated_at
         FROM tenant
         WHERE tenant_code = #{tenantCode}
     </select>
@@ -34,7 +35,7 @@
     <!-- Find All -->
     <select id="findAll" resultMap="TenantResultMap">
         SELECT id, tenant_code, tenant_name, status, expired_at,
-               max_users, created_at, updated_at
+               max_users, is_platform, created_at, updated_at
         FROM tenant
         ORDER BY id
     </select>
@@ -48,8 +49,8 @@
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.Tenant" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO tenant (tenant_code, tenant_name, status, expired_at, max_users)
-        VALUES (#{tenantCode}, #{tenantName}, #{status}, #{expiredAt}, #{maxUsers})
+        INSERT INTO tenant (tenant_code, tenant_name, status, expired_at, max_users, is_platform)
+        VALUES (#{tenantCode}, #{tenantName}, #{status}, #{expiredAt}, #{maxUsers}, #{isPlatform})
     </insert>
 
     <!-- Update -->
@@ -59,6 +60,7 @@
             status = #{status},
             expired_at = #{expiredAt},
             max_users = #{maxUsers},
+            is_platform = #{isPlatform},
             updated_at = NOW()
         WHERE id = #{id}
     </update>

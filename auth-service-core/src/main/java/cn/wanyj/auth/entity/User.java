@@ -50,4 +50,21 @@ public class User {
 
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+    /**
+     * Check if the user is a platform admin
+     * Platform admin must satisfy:
+     * 1. tenantId = 0 (platform tenant)
+     * 2. has ROLE_PLATFORM_ADMIN role
+     *
+     * @return true if user is platform admin
+     */
+    public boolean isPlatformAdmin() {
+        if (tenantId == null || tenantId != 0L) {
+            return false;
+        }
+
+        return roles.stream()
+                .anyMatch(role -> "ROLE_PLATFORM_ADMIN".equals(role.getCode()));
+    }
 }

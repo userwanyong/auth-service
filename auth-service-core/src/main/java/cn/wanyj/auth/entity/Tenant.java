@@ -50,6 +50,11 @@ public class Tenant {
     private Integer maxUsers;
 
     /**
+     * 是否为平台租户：0-否，1-是
+     */
+    private Boolean isPlatform;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;
@@ -84,5 +89,15 @@ public class Tenant {
      */
     public boolean isDefault() {
         return id != null && id.equals(1L);
+    }
+
+    /**
+     * 检查是否为平台租户
+     * 平台租户的 tenantId = 0
+     *
+     * @return 是否为平台租户
+     */
+    public boolean isPlatformTenant() {
+        return isPlatform != null && isPlatform;
     }
 }

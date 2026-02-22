@@ -66,4 +66,30 @@ public class SecurityUtils {
     public static void clearAuthentication() {
         SecurityContextHolder.clearContext();
     }
+
+    /**
+     * Check if current user is a platform admin
+     * Platform admin must satisfy:
+     * 1. tenantId = 0 (platform tenant)
+     * 2. has ROLE_PLATFORM_ADMIN role
+     *
+     * @return true if current user is platform admin
+     */
+    public static boolean isPlatformAdmin() {
+        Long currentTenantId = getCurrentTenantId();
+
+        // Check if user is in platform tenant (tenantId = 0)
+        if (currentTenantId == null || currentTenantId != 0L) {
+            return false;
+        }
+
+        // Check if user has ROLE_PLATFORM_ADMIN
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> "ROLE_PLATFORM_ADMIN".equals(auth.getAuthority()));
+    }
 }

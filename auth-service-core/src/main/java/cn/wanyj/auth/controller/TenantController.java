@@ -9,12 +9,12 @@ import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.TenantMapper;
 import cn.wanyj.auth.service.TenantService;
+import cn.wanyj.auth.security.PreAuthorizePlatformAdmin;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,7 +40,7 @@ public class TenantController {
      * 仅管理员可访问
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<TenantResponse>> createTenant(@Valid @RequestBody TenantCreateRequest request) {
         log.info("Creating tenant: {}", request.getTenantCode());
 
@@ -50,6 +50,7 @@ public class TenantController {
                 .status(request.getStatus() != null ? request.getStatus() : 1)
                 .expiredAt(request.getExpiredAt())
                 .maxUsers(request.getMaxUsers() != null ? request.getMaxUsers() : Integer.MAX_VALUE)
+                .isPlatform(false)  // 通过API创建的租户都不是平台租户
                 .build();
 
         Tenant created = tenantService.createTenant(tenant);
@@ -63,7 +64,7 @@ public class TenantController {
      * 仅管理员可访问
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<TenantResponse>> updateTenant(
             @PathVariable Long id,
             @Valid @RequestBody TenantUpdateRequest request) {
@@ -99,7 +100,7 @@ public class TenantController {
      * 仅管理员可访问
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<TenantResponse>> getTenant(@PathVariable Long id) {
         log.info("Getting tenant: {}", id);
 
@@ -116,7 +117,7 @@ public class TenantController {
      * 仅管理员可访问
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<List<TenantResponse>>> listTenants() {
         log.info("Listing all tenants");
 
@@ -133,7 +134,7 @@ public class TenantController {
      * 仅管理员可访问
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<Void>> deleteTenant(@PathVariable Long id) {
         log.info("Deleting tenant: {}", id);
 
