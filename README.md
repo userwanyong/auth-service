@@ -10,11 +10,12 @@
 
 ## 特性
 
+- **Web 管理界面**：内置完整的前端管理界面，支持用户/角色/权限/租户管理
 - **双协议支持**：REST API (HTTP) + Dubbo RPC (Triple 协议)
 - **服务注册发现**：集成 Nacos 注册中心
 - **JWT 双令牌机制**：Access Token + Refresh Token
-- **RBAC 权限模型**：用户-角色-权限三层模型
-- **多租户支持**：基于 tenant_id 的数据隔离
+- **RBAC 权限模型**：用户-角色-权限三层模型，支持完整的 CRUD 权限
+- **多租户支持**：基于 tenant_id 的数据隔离，创建租户自动初始化管理员
 - **平台级权限**：租户管理与平台管理员角色
 - **令牌黑名单**：支持主动注销与令牌撤销
 - **Redis 缓存**：令牌存储与会话管理
@@ -76,54 +77,117 @@
 | Nacos | 3.1+ | 服务注册中心 |
 | Maven | 3.6+ | 构建工具 |
 
+## 部署方式
+
+前置准备：mysql、redis、nacos、并确保已执行数据库初始化脚本
+
+### 方式一：Docker Compose 部署脚本（推荐）
+
+使用 Docker Compose 部署应用服务。
+
+```yml
+version: '3.8'
+
+services:
+  auth-service:
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:2.0
+    container_name: auth-service-app
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 12123
+      # Redis Configuration
+      SPRING_DATA_REDIS_HOST: 127.0.0.1
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: 12123
+      # Nacos Configuration
+      dubbo.registry.address: nacos://127.0.0.1:8848
+      dubbo.registry.username: nacos
+      dubbo.registry.password: nacos
+      dubbo.metadata-report.address: nacos://127.0.0.1:8848
+      dubbo.metadata-report.username: nacos
+      dubbo.metadata-report.password: nacos
+      # JVM Configuration
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -XX:+PrintGCDetails
+        -XX:+PrintGCTimeStamps
+        -Xlog:gc*:file=/logs/gc.log:time,tags:filecount=10,filesize=100M
+    ports:
+      - "8123:8123"   # REST API
+      - "20880:20880" # Dubbo RPC
+    volumes:
+      - app-logs:/app/logs
+    networks:
+      - auth-network
+
+# Named volumes for data persistence
+volumes:
+  app-logs:
+    driver: local
+
+# Network for service communication
+networks:
+  auth-network:
+    driver: bridge
+```
+
+**服务说明：**
+
+| 服务 | 端口映射 | 说明 |
+|------|----------|------|
+| auth-service | 8123 | 应用服务（REST API） |
+| mysql | 3306 | 数据库 |
+| redis | 6379 | 缓存服务 |
+| nacos | 8848 | 注册中心 |
+
+**访问地址：**
+- Web 管理界面：http://localhost:8123
+
+### 方式二：开发环境运行
+
+**IDE 配置（IDEA / Eclipse）：**
+
+1. 导入项目为 Maven 项目
+2. 等待依赖下载完成
+3. 运行 `AuthServiceApplication` 主类
+
+**或使用 Maven 命令：**
+```bash
+mvn spring-boot:run -pl auth-service-core
+```
+
 ## 快速开始
 
-### 1. 初始化数据库
+### 1. 启动服务
 
-```sql
-CREATE DATABASE auth_service CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+按照上述"部署方式"中的任一方式启动服务。
 
-执行 `docs/init-schema.sql` 初始化表结构和默认数据。
+### 2. 访问管理界面
 
-### 2. 配置文件
+打开浏览器访问：http://localhost:8123
 
-修改 `auth-service-core/src/main/resources/application.yaml`：
+### 3. 登录系统
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/auth_service
-    username: root
-    password: your_password
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password: your_redis_password
+使用默认管理员账户登录：
 
-# Dubbo 注册中心配置
-dubbo:
-  registry:
-    address: nacos://localhost:8848
-    username: nacos
-    password: nacos
-```
+**平台租户登录：**
+- 用户名：`admin`
+- 密码：`123456`
+- 租户：`平台租户`
 
-### 3. 编译并启动
+**演示租户登录：**
+- 用户名：`admin`
+- 密码：`123456`
+- 租户：`演示租户`
 
-```bash
-# 编译项目
-mvn clean install
+### 4. 开始使用
 
-# 启动服务
-cd auth-service-core
-mvn spring-boot:run
-```
-
-服务将在以下端口启动：
-- REST API: `http://localhost:8123`
-- Dubbo RPC: `localhost:20880`
+登录后即可进行用户、角色、权限、租户管理。
 
 ## API 接口
 
@@ -366,10 +430,18 @@ auth-service/
 |------|------|------|------|
 | 租户 | platform | 平台租户 | 用于平台管理 |
 | 租户 | demo | 演示租户 | 默认演示租户 |
-| 用户 | admin | 平台管理员 | 密码：123456 |
-| 角色 | ROLE_PLATFORM_ADMIN | 平台管理员 | 拥有租户管理权限 |
-| 角色 | ROLE_ADMIN | 系统管理员 | 拥有所有权限 |
-| 角色 | ROLE_USER | 普通用户 | 基础用户权限 |
+
+**默认管理员账户：**
+
+| 租户 | 用户名 | 密码 | 角色 | 权限 |
+|------|--------|------|------|------|
+| 平台租户 (id=0) | admin | 123456 | ROLE_PLATFORM_ADMIN | 租户管理权限 |
+| 演示租户 (id=1) | admin | 123456 | ROLE_ADMIN | 所有用户/角色/权限管理权限 |
+
+**默认角色：**
+- `ROLE_PLATFORM_ADMIN`：平台管理员（tenant_id=0）
+- `ROLE_ADMIN`：系统管理员（拥有所有 CRUD 权限）
+- `ROLE_USER`：普通用户（仅查看权限）
 
 ## 技术栈
 
@@ -631,14 +703,57 @@ curl -X POST http://localhost:8123/api/tenant \
 
 ## 常见问题
 
-### 1. 如何创建平台管理员？
+### 1. 默认管理员账户是什么？
 
-使用初始化脚本创建的默认平台管理员：
-- 用户名：`admin`
-- 密码：`123456`
-- 租户：平台租户 (tenant_id=0)
+系统初始化后会创建两个管理员账户：
 
-### 2. 如何为业务服务集成认证？
+| 租户 | 用户名 | 密码 | 功能 |
+|------|--------|------|------|
+| 平台租户 (id=0) | admin | 123456 | 租户管理，可创建新租户 |
+| 演示租户 (id=1) | admin | 123456 | 用户/角色/权限管理 |
+
+**安全提示**：生产环境请务必修改默认密码！
+
+### 2. 如何访问 Web 管理界面？
+
+服务启动后访问：http://localhost:8123
+
+根据登录的租户不同，管理界面会显示不同的功能：
+- **平台租户**：只能看到租户管理
+- **普通租户**：可以看到用户、角色、权限管理
+
+### 3. 如何创建新租户？
+
+1. 使用平台租户账户登录
+2. 进入"租户管理"页面
+3. 点击"添加租户"
+4. 填写租户信息并保存
+
+**注意**：创建新租户时会自动：
+- 初始化 12 个 CRUD 权限（user:read/write/create/delete, role:read/write/create/delete, permission:read/write/create/delete）
+- 创建 ROLE_ADMIN 和 ROLE_USER 角色
+- 创建管理员用户（admin/123456）
+
+### 4. 权限系统是如何工作的？
+
+系统采用 RBAC（基于角色的访问控制）模型：
+
+```
+用户 ←→ 角色 ←→ 权限
+```
+
+**CRUD 权限说明**：
+- `create`: 创建资源
+- `read`: 查看资源
+- `write`: 编辑资源
+- `delete`: 删除资源
+
+**默认权限列表**：
+- 用户管理：user:read, user:create, user:write, user:delete
+- 角色管理：role:read, role:create, role:write, role:delete
+- 权限管理：permission:read, permission:create, permission:write, permission:delete
+
+### 5. 如何为业务服务集成认证？
 
 **步骤1：添加 Maven 依赖**
 
@@ -662,31 +777,9 @@ TokenValidationResult result = authRpcService.parseToken(
 );
 ```
 
-### 3. 如何切换租户？
+### 6. 如何切换租户？
 
-登录/注册时在请求体中指定 `tenantId`：
-```json
-{
-  "username": "alice",
-  "password": "password123",
-  "tenantId": 1
-}
-```
-
-### 4. 如何自定义权限？
-
-通过 PermissionController 或直接插入数据库：
-```sql
-INSERT INTO permission (tenant_id, code, name, resource, action)
-VALUES (1, 'order:create', '创建订单', 'order', 'create');
-```
-
-### 5. Triple 协议的优势？
-
-- 基于 HTTP/2，支持多路复用
-- 支持 Protobuf 序列化，性能更高
-- 跨语言兼容性更好
-- 支持流式调用
+登录时在登录页面选择对应的租户即可。JWT 令牌中包含 tenant_id 信息，后续请求会自动识别租户。
 
 ## 许可证
 
