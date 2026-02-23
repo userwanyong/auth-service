@@ -205,6 +205,18 @@ SET sql_mode=(SELECT REPLACE(@@sql_mode,'NO_AUTO_VALUE_ON_ZERO',''));
 INSERT IGNORE INTO `user_role` (`tenant_id`, `user_id`, `role_id`)
 VALUES (0, 0, 0);
 
+-- Insert default demo tenant admin user (username: admin, password: 123456)
+-- Password is bcrypt hash of '123456'
+SET sql_mode='NO_AUTO_VALUE_ON_ZERO';
+INSERT INTO `user` (`id`, `tenant_id`, `username`, `password`, `nickname`, `status`, `email_verified`) VALUES
+(1, 1, 'admin', '$2a$10$z/I75HJV6HhtTpT1fzgcZ.WMzOPvej2.0trqSqgleMPdHUvJUxGDC', '演示管理员', 1, TRUE)
+ON DUPLICATE KEY UPDATE `password` = VALUES(`password`);
+SET sql_mode=(SELECT REPLACE(@@sql_mode,'NO_AUTO_VALUE_ON_ZERO',''));
+
+-- Assign admin role to demo tenant admin user
+INSERT IGNORE INTO `user_role` (`tenant_id`, `user_id`, `role_id`)
+VALUES (1, 1, 1);
+
 -- ============================================
 -- Schema Initialization Complete
 -- ============================================
