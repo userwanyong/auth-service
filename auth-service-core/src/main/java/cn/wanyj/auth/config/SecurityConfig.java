@@ -68,8 +68,18 @@ public class SecurityConfig {
 
                 // Configure authorization rules
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints (register, login, refresh token, logout)
+                        // Static resources (frontend assets)
+                        .requestMatchers("/", "/index.html", "/login", "/login.html").permitAll()
+                        .requestMatchers("/assets/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+
+                        // Chrome DevTools (browser auto-request)
+                        .requestMatchers("/.well-known/**").permitAll()
+
+                        // Public API endpoints (register, login, refresh token, logout)
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
+
+                        // Tenant code check and available tenants (for login/registration)
+                        .requestMatchers("/api/tenant/check-code", "/api/tenant/available").permitAll()
 
                         // Health check endpoint
                         .requestMatchers("/actuator/health").permitAll()

@@ -158,7 +158,7 @@ public class RoleServiceImpl implements RoleService {
             }
 
             // Create RolePermission relationship
-            roleMapper.insertRolePermission(roleId, permissionId);
+            roleMapper.insertRolePermission(roleId, permissionId, role.getTenantId());
         }
 
         log.info("Permissions assigned successfully to role: {}", roleId);

@@ -39,6 +39,14 @@ public interface TenantMapper {
     List<Tenant> findAll();
 
     /**
+     * 查询激活的租户（用于登录页面）
+     * 只返回状态为1且未过期的租户
+     *
+     * @return 激活的租户列表
+     */
+    List<Tenant> findActive();
+
+    /**
      * 检查租户编码是否存在
      *
      * @param tenantCode 租户编码

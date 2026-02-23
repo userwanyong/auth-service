@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +71,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(ErrorCode.ACCESS_DENIED));
+    }
+
+    /**
+     * Handle Validation Exception
+     * 处理参数校验异常
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        String resourcePath = e.getResourcePath();
+        // Silently ignore .well-known requests (Chrome DevTools and other browser features)
+        if (resourcePath != null && resourcePath.startsWith(".well-known/")) {
+            return ResponseEntity.notFound().build();
+        }
+        // Log other missing resources at debug level
+        logger.debug("Resource not found: {}", resourcePath);
+        return ResponseEntity.notFound().build();
     }
 
     /**

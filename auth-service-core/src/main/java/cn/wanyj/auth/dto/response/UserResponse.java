@@ -21,6 +21,7 @@ import java.util.Set;
 public class UserResponse {
 
     private Long id;
+    private Long tenantId;
     private String username;
     private String email;
     private String phone;

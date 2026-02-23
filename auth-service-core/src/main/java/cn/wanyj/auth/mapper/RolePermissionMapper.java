@@ -66,4 +66,10 @@ public interface RolePermissionMapper {
      * 统计权限的角色数量
      */
     long countByPermissionId(@Param("permissionId") Long permissionId);
+
+    /**
+     * Delete role permissions by tenant id
+     * 根据租户ID删除所有角色权限关联
+     */
+    int deleteByTenantId(@Param("tenantId") Long tenantId);
 }

@@ -70,6 +70,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public PageResponse<UserResponse> searchUsers(String keyword, Integer page, Integer size) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
+        log.info("searchUsers called with: keyword={}, page={}, size={}, tenantId={}", keyword, page, size, tenantId);
         List<User> users;
         long total;
 
@@ -77,11 +78,12 @@ public class UserServiceImpl implements UserService {
             users = userMapper.findByKeyword(keyword, tenantId);
             total = userMapper.countByKeyword(keyword, tenantId);
         } else {
-            // For simplicity, returning all users with pagination done in code
-            // In production, you should implement proper pagination in MyBatis
-            users = List.of(); // Empty list for now
-            total = 0;
+            // Get all users with roles for the tenant when no keyword is provided
+            users = userMapper.findAllByTenantIdWithRoles(tenantId);
+            total = userMapper.countAllByTenantId(tenantId);
         }
+
+        log.info("Found {} users for tenantId={}, total={}", users.size(), tenantId, total);
 
         // Apply pagination
         int start = (page - 1) * size;
@@ -119,7 +121,7 @@ public class UserServiceImpl implements UserService {
             }
 
             // Create UserRole relationship
-            userMapper.insertUserRole(userId, roleId);
+            userMapper.insertUserRole(userId, roleId, role.getTenantId());
         }
 
         log.info("Roles assigned successfully to user: {}", userId);
@@ -176,6 +178,7 @@ public class UserServiceImpl implements UserService {
 
         return UserResponse.builder()
                 .id(user.getId())
+                .tenantId(user.getTenantId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .phone(user.getPhone())
@@ -194,13 +197,21 @@ public class UserServiceImpl implements UserService {
      * Map User entity to simplified UserResponse DTO (for list view)
      */
     private UserResponse mapToSimpleUserResponse(User user) {
+        Set<String> roles = user.getRoles() != null ?
+                user.getRoles().stream()
+                        .map(Role::getCode)
+                        .collect(Collectors.toSet()) :
+                new HashSet<>();
+
         return UserResponse.builder()
                 .id(user.getId())
+                .tenantId(user.getTenantId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())
+                .roles(roles)
                 .build();
     }
 }

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Service - 管理后台</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Auth Service</h2>
+                <span class="sidebar-subtitle">管理后台</span>
+            </div>
+            <nav class="sidebar-nav">
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                            <span class="nav-icon">📊</span>
+                            <span class="nav-text">仪表盘</span>
+                        </a>
+                    </li>
+                    <li class="nav-item tenant-only">
+                        <a href="#users" class="nav-link" data-page="users">
+                            <span class="nav-icon">👥</span>
+                            <span class="nav-text">用户管理</span>
+                        </a>
+                    </li>
+                    <li class="nav-item tenant-only">
+                        <a href="#roles" class="nav-link" data-page="roles">
+                            <span class="nav-icon">🔐</span>
+                            <span class="nav-text">角色管理</span>
+                        </a>
+                    </li>
+                    <li class="nav-item tenant-only">
+                        <a href="#permissions" class="nav-link" data-page="permissions">
+                            <span class="nav-icon">⚡</span>
+                            <span class="nav-text">权限管理</span>
+                        </a>
+                    </li>
+                    <li class="nav-item platform-tenant-only" style="display: none;">
+                        <a href="#tenants" class="nav-link" data-page="tenants">
+                            <span class="nav-icon">🏢</span>
+                            <span class="nav-text">租户管理</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <span id="userAvatar">U</span>
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">-</div>
+                        <div class="user-tenant" id="userTenant">-</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <button class="menu-toggle" id="menuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="header-actions">
+                    <span class="user-role-badge" id="userRoleBadge">-</span>
+                    <button class="btn btn-outline" id="logoutBtn">退出登录</button>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="pageContent">
+                <!-- Dashboard Page -->
+                <section class="page active" id="page-dashboard">
+                    <h1>仪表盘</h1>
+                    <div class="stats-grid">
+                        <div class="stat-card tenant-only">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="statUsers">-</div>
+                                <div class="stat-label">用户总数</div>
+                            </div>
+                        </div>
+                        <div class="stat-card tenant-only">
+                            <div class="stat-icon">🔐</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="statRoles">-</div>
+                                <div class="stat-label">角色总数</div>
+                            </div>
+                        </div>
+                        <div class="stat-card tenant-only">
+                            <div class="stat-icon">⚡</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="statPermissions">-</div>
+                                <div class="stat-label">权限总数</div>
+                            </div>
+                        </div>
+                        <div class="stat-card platform-tenant-only" style="display: none;">
+                            <div class="stat-icon">🏢</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="statTenants">-</div>
+                                <div class="stat-label">租户总数</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="welcome-card">
+                        <h2>欢迎使用 Auth Service 管理后台</h2>
+                        <p>这是一个基于 Spring Boot 3.4 + JWT + RBAC 的认证服务管理系统。</p>
+                        <ul>
+                            <li>支持多租户隔离</li>
+                            <li>基于角色的访问控制 (RBAC)</li>
+                            <li>JWT 双令牌认证机制</li>
+                            <li>平台级权限管理</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Users Page -->
+                <section class="page" id="page-users">
+                    <div class="page-header">
+                        <h1>用户管理</h1>
+                        <button class="btn btn-primary" id="addUserBtn">添加用户</button>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-filters">
+                            <input type="text" class="search-input" id="userSearch" placeholder="搜索用户名...">
+                            <button class="btn btn-secondary" id="userSearchBtn">搜索</button>
+                            <button class="btn btn-outline" id="userResetBtn">重置</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>邮箱</th>
+                                    <th>昵称</th>
+                                    <th>状态</th>
+                                    <th>当前角色</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr><td colspan="7" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="pagination" id="usersPagination"></div>
+                    </div>
+                </section>
+
+                <!-- Roles Page -->
+                <section class="page" id="page-roles">
+                    <div class="page-header">
+                        <h1>角色管理</h1>
+                        <button class="btn btn-primary" id="addRoleBtn">添加角色</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>角色编码</th>
+                                    <th>角色名称</th>
+                                    <th>描述</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rolesTableBody">
+                                <tr><td colspan="6" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Permissions Page -->
+                <section class="page" id="page-permissions">
+                    <div class="page-header">
+                        <h1>权限管理</h1>
+                        <button class="btn btn-primary" id="addPermissionBtn">添加权限</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>权限编码</th>
+                                    <th>权限名称</th>
+                                    <th>资源</th>
+                                    <th>操作</th>
+                                    <th>描述</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissionsTableBody">
+                                <tr><td colspan="7" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Tenants Page -->
+                <section class="page" id="page-tenants">
+                    <div class="page-header">
+                        <h1>租户管理</h1>
+                        <button class="btn btn-primary" id="addTenantBtn">添加租户</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>租户编码</th>
+                                    <th>租户名称</th>
+                                    <th>状态</th>
+                                    <th>用户数/上限</th>
+                                    <th>过期时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tenantsTableBody">
+                                <tr><td colspan="7" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- User Modal -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="userModalTitle">添加用户</h3>
+                <button class="modal-close" data-close="userModal">&times;</button>
+            </div>
+            <form class="modal-body" id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>用户名 *</label>
+                    <input type="text" class="form-control" id="userUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-control" id="userPassword">
+                    <small class="form-text">编辑时留空则不修改密码</small>
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" class="form-control" id="userEmail">
+                </div>
+                <div class="form-group">
+                    <label>昵称</label>
+                    <input type="text" class="form-control" id="userNickname">
+                </div>
+                <div class="form-group">
+                    <label>状态</label>
+                    <select class="form-control" id="userStatus">
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="userModal">取消</button>
+                <button class="btn btn-primary" id="userSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Modal -->
+    <div class="modal" id="roleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="roleModalTitle">添加角色</h3>
+                <button class="modal-close" data-close="roleModal">&times;</button>
+            </div>
+            <form class="modal-body" id="roleForm">
+                <input type="hidden" id="roleId">
+                <div class="form-group">
+                    <label>角色编码 *</label>
+                    <input type="text" class="form-control" id="roleCode" required>
+                </div>
+                <div class="form-group">
+                    <label>角色名称 *</label>
+                    <input type="text" class="form-control" id="roleName" required>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea class="form-control" id="roleDescription" rows="3"></textarea>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="roleModal">取消</button>
+                <button class="btn btn-primary" id="roleSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Permissions Modal -->
+    <div class="modal" id="rolePermissionsModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>分配权限</h3>
+                <button class="modal-close" data-close="rolePermissionsModal">&times;</button>
+            </div>
+            <form class="modal-body" id="rolePermissionsForm">
+                <input type="hidden" id="rolePermissionsRoleId">
+                <div class="form-group">
+                    <label>选择权限</label>
+                    <div class="checkbox-group" id="permissionsCheckboxes"></div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="rolePermissionsModal">取消</button>
+                <button class="btn btn-primary" id="rolePermissionsSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Roles Modal -->
+    <div class="modal" id="userRolesModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>分配角色</h3>
+                <button class="modal-close" data-close="userRolesModal">&times;</button>
+            </div>
+            <form class="modal-body" id="userRolesForm">
+                <input type="hidden" id="userRolesUserId">
+                <div class="form-group">
+                    <label>选择角色</label>
+                    <div class="checkbox-group" id="userRolesCheckboxes"></div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="userRolesModal">取消</button>
+                <button class="btn btn-primary" id="userRolesSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Modal -->
+    <div class="modal" id="permissionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="permissionModalTitle">添加权限</h3>
+                <button class="modal-close" data-close="permissionModal">&times;</button>
+            </div>
+            <form class="modal-body" id="permissionForm">
+                <input type="hidden" id="permissionId">
+                <div class="form-group">
+                    <label>权限编码 *</label>
+                    <input type="text" class="form-control" id="permissionCode" required>
+                </div>
+                <div class="form-group">
+                    <label>权限名称 *</label>
+                    <input type="text" class="form-control" id="permissionName" required>
+                </div>
+                <div class="form-group">
+                    <label>资源 *</label>
+                    <input type="text" class="form-control" id="permissionResource" required>
+                </div>
+                <div class="form-group">
+                    <label>操作 *</label>
+                    <select class="form-control" id="permissionAction" required>
+                        <option value="">请选择</option>
+                        <option value="create">创建</option>
+                        <option value="read">读取</option>
+                        <option value="write">写入</option>
+                        <option value="delete">删除</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea class="form-control" id="permissionDescription" rows="3"></textarea>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="permissionModal">取消</button>
+                <button class="btn btn-primary" id="permissionSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenant Modal -->
+    <div class="modal" id="tenantModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="tenantModalTitle">添加租户</h3>
+                <button class="modal-close" data-close="tenantModal">&times;</button>
+            </div>
+            <form class="modal-body" id="tenantForm">
+                <input type="hidden" id="tenantId">
+                <div class="form-group">
+                    <label>租户编码 *</label>
+                    <input type="text" class="form-control" id="tenantCode" required>
+                </div>
+                <div class="form-group">
+                    <label>租户名称 *</label>
+                    <input type="text" class="form-control" id="tenantName" required>
+                </div>
+                <div class="form-group">
+                    <label>状态</label>
+                    <select class="form-control" id="tenantStatus">
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>最大用户数</label>
+                    <input type="number" class="form-control" id="tenantMaxUsers" value="100">
+                </div>
+                <div class="form-group">
+                    <label>过期时间</label>
+                    <input type="datetime-local" class="form-control" id="tenantExpiredAt">
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="tenantModal">取消</button>
+                <button class="btn btn-primary" id="tenantSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>

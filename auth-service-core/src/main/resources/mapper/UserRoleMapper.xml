@@ -6,6 +6,7 @@
     <!-- Result Map -->
     <resultMap id="UserRoleResultMap" type="cn.wanyj.auth.entity.UserRole">
         <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="userId" column="user_id"/>
         <result property="roleId" column="role_id"/>
         <result property="createdAt" column="created_at"/>
@@ -13,29 +14,29 @@
 
     <!-- Find By User Id -->
     <select id="findByUserId" resultMap="UserRoleResultMap">
-        SELECT id, user_id, role_id, created_at
+        SELECT id, tenant_id, user_id, role_id, created_at
         FROM user_role
         WHERE user_id = #{userId}
     </select>
 
     <!-- Find By Role Id -->
     <select id="findByRoleId" resultMap="UserRoleResultMap">
-        SELECT id, user_id, role_id, created_at
+        SELECT id, tenant_id, user_id, role_id, created_at
         FROM user_role
         WHERE role_id = #{roleId}
     </select>
 
     <!-- Find By User Id And Role Id -->
     <select id="findByUserIdAndRoleId" resultMap="UserRoleResultMap">
-        SELECT id, user_id, role_id, created_at
+        SELECT id, tenant_id, user_id, role_id, created_at
         FROM user_role
         WHERE user_id = #{userId} AND role_id = #{roleId}
     </select>
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.UserRole" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user_role (user_id, role_id, created_at)
-        VALUES (#{userId}, #{roleId}, NOW())
+        INSERT INTO user_role (user_id, role_id, tenant_id, created_at)
+        VALUES (#{userId}, #{roleId}, #{tenantId}, NOW())
     </insert>
 
     <!-- Delete By User Id And Role Id -->
@@ -63,5 +64,10 @@
     <select id="countByRoleId" resultType="long">
         SELECT COUNT(*) FROM user_role WHERE role_id = #{roleId}
     </select>
+
+    <!-- Delete By Tenant Id -->
+    <delete id="deleteByTenantId">
+        DELETE FROM user_role WHERE tenant_id = #{tenantId}
+    </delete>
 
 </mapper>

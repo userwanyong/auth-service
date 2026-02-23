@@ -138,9 +138,9 @@ public class TenantController {
     public ResponseEntity<ApiResponse<Void>> deleteTenant(@PathVariable Long id) {
         log.info("Deleting tenant: {}", id);
 
-        // 不允许删除默认租户
-        if (id.equals(1L)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "不允许删除默认租户");
+        // 不允许删除平台租户（id=0）
+        if (id.equals(0L)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不允许删除平台租户");
         }
 
         tenantService.deleteTenant(id);
@@ -154,6 +154,34 @@ public class TenantController {
     public ResponseEntity<ApiResponse<Boolean>> checkCodeAvailable(@RequestParam String code) {
         boolean available = !tenantService.existsByCode(code);
         return ResponseEntity.ok(ApiResponse.success(200, "成功", available));
+    }
+
+    /**
+     * 获取可用的租户列表（公开接口，用于登录页面）
+     * 只返回激活状态的租户
+     */
+    @GetMapping("/available")
+    public ResponseEntity<ApiResponse<List<TenantResponse>>> getAvailableTenants() {
+        log.info("Getting available tenants for login");
+
+        List<cn.wanyj.auth.entity.Tenant> tenants = tenantService.getActiveTenants();
+        List<TenantResponse> responses = tenants.stream()
+                .map(this::mapToSimpleResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success(200, "成功", responses));
+    }
+
+    /**
+     * 映射 Tenant 到简单的 TenantResponse（用于登录页面）
+     */
+    private TenantResponse mapToSimpleResponse(cn.wanyj.auth.entity.Tenant tenant) {
+        return TenantResponse.builder()
+                .id(tenant.getId())
+                .tenantCode(tenant.getTenantCode())
+                .tenantName(tenant.getTenantName())
+                .status(tenant.getStatus())
+                .build();
     }
 
     /**

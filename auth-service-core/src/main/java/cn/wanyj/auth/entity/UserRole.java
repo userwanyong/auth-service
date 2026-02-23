@@ -19,6 +19,8 @@ public class UserRole {
 
     private Long id;
 
+    private Long tenantId;
+
     private Long userId;
 
     private Long roleId;

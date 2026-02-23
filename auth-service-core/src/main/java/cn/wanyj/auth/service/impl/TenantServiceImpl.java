@@ -3,14 +3,19 @@ package cn.wanyj.auth.service.impl;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.entity.Role;
 import cn.wanyj.auth.entity.Tenant;
+import cn.wanyj.auth.entity.User;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.PermissionMapper;
 import cn.wanyj.auth.mapper.RoleMapper;
+import cn.wanyj.auth.mapper.RolePermissionMapper;
 import cn.wanyj.auth.mapper.TenantMapper;
+import cn.wanyj.auth.mapper.UserMapper;
+import cn.wanyj.auth.mapper.UserRoleMapper;
 import cn.wanyj.auth.service.TenantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +35,10 @@ public class TenantServiceImpl implements TenantService {
     private final TenantMapper tenantMapper;
     private final RoleMapper roleMapper;
     private final PermissionMapper permissionMapper;
+    private final UserMapper userMapper;
+    private final UserRoleMapper userRoleMapper;
+    private final RolePermissionMapper rolePermissionMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public boolean isValidTenant(Long tenantId) {
@@ -118,31 +127,51 @@ public class TenantServiceImpl implements TenantService {
     }
 
     @Override
+    @Transactional
     public void deleteTenant(Long tenantId) {
+        // 不允许删除平台租户（tenantId=0）
+        if (tenantId.equals(0L)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不允许删除平台租户");
+        }
+
         // 检查租户是否存在
         Tenant tenant = getTenantById(tenantId);
         if (tenant == null) {
             throw new BusinessException(ErrorCode.TENANT_NOT_FOUND);
         }
 
-        // 不允许删除默认租户
-        if (tenantId.equals(1L)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "不允许删除默认租户");
-        }
+        // 级联删除租户下的所有相关数据
+        log.info("Deleting tenant and all related data: id={}", tenantId);
 
-        // 检查是否还有用户
-        long userCount = tenantMapper.countUsersByTenantId(tenantId);
-        if (userCount > 0) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "租户下还有 " + userCount + " 个用户，无法删除");
-        }
+        // 1. 删除用户角色关联（user_role表有tenant_id字段）
+        userRoleMapper.deleteByTenantId(tenantId);
 
+        // 2. 删除角色权限关联（role_permission表有tenant_id字段）
+        rolePermissionMapper.deleteByTenantId(tenantId);
+
+        // 3. 删除权限
+        permissionMapper.deleteByTenantId(tenantId);
+
+        // 4. 删除角色
+        roleMapper.deleteByTenantId(tenantId);
+
+        // 5. 删除用户
+        userMapper.deleteByTenantId(tenantId);
+
+        // 6. 最后删除租户
         tenantMapper.deleteById(tenantId);
-        log.info("Deleted tenant: id={}", tenantId);
+
+        log.info("Deleted tenant and all related data: id={}", tenantId);
     }
 
     @Override
     public List<Tenant> getAllTenants() {
         return tenantMapper.findAll();
+    }
+
+    @Override
+    public List<Tenant> getActiveTenants() {
+        return tenantMapper.findActive();
     }
 
     @Override
@@ -168,22 +197,33 @@ public class TenantServiceImpl implements TenantService {
 
         // 1. 创建默认权限
         Permission[] defaultPermissions = {
+            // 用户权限
             Permission.builder().tenantId(tenantId).code("user:read").name("查看用户")
                 .resource("user").action("read").description("查看用户信息").build(),
+            Permission.builder().tenantId(tenantId).code("user:create").name("创建用户")
+                .resource("user").action("create").description("创建用户").build(),
             Permission.builder().tenantId(tenantId).code("user:write").name("编辑用户")
                 .resource("user").action("write").description("编辑用户信息").build(),
             Permission.builder().tenantId(tenantId).code("user:delete").name("删除用户")
                 .resource("user").action("delete").description("删除用户").build(),
+            // 角色权限
             Permission.builder().tenantId(tenantId).code("role:read").name("查看角色")
                 .resource("role").action("read").description("查看角色信息").build(),
+            Permission.builder().tenantId(tenantId).code("role:create").name("创建角色")
+                .resource("role").action("create").description("创建角色").build(),
             Permission.builder().tenantId(tenantId).code("role:write").name("编辑角色")
                 .resource("role").action("write").description("编辑角色信息").build(),
+            Permission.builder().tenantId(tenantId).code("role:delete").name("删除角色")
+                .resource("role").action("delete").description("删除角色").build(),
+            // 权限权限
             Permission.builder().tenantId(tenantId).code("permission:read").name("查看权限")
                 .resource("permission").action("read").description("查看权限信息").build(),
-            Permission.builder().tenantId(tenantId).code("tenant:read").name("查看租户")
-                .resource("tenant").action("read").description("查看租户信息").build(),
-            Permission.builder().tenantId(tenantId).code("tenant:write").name("编辑租户")
-                .resource("tenant").action("write").description("编辑租户信息").build()
+            Permission.builder().tenantId(tenantId).code("permission:create").name("创建权限")
+                .resource("permission").action("create").description("创建权限").build(),
+            Permission.builder().tenantId(tenantId).code("permission:write").name("编辑权限")
+                .resource("permission").action("write").description("编辑权限信息").build(),
+            Permission.builder().tenantId(tenantId).code("permission:delete").name("删除权限")
+                .resource("permission").action("delete").description("删除权限").build()
         };
 
         for (Permission permission : defaultPermissions) {
@@ -227,14 +267,42 @@ public class TenantServiceImpl implements TenantService {
         for (Permission permission : defaultPermissions) {
             Permission existingPermission = permissionMapper.findByCode(permission.getCode(), tenantId);
             if (existingPermission != null) {
-                roleMapper.insertRolePermission(adminRole.getId(), existingPermission.getId());
+                roleMapper.insertRolePermission(adminRole.getId(), existingPermission.getId(), tenantId);
             }
         }
 
         // 4. 为普通用户角色分配只读权限
         Permission userReadPermission = permissionMapper.findByCode("user:read", tenantId);
         if (userReadPermission != null) {
-            roleMapper.insertRolePermission(userRole.getId(), userReadPermission.getId());
+            roleMapper.insertRolePermission(userRole.getId(), userReadPermission.getId(), tenantId);
+        }
+
+        // 5. 创建租户管理员用户
+        // 检查管理员用户是否已存在
+        User existingAdmin = userMapper.findByUsername("admin", tenantId);
+        if (existingAdmin == null) {
+            User adminUser = User.builder()
+                    .tenantId(tenantId)
+                    .username("admin")
+                    .password(passwordEncoder.encode("123456"))
+                    .nickname("管理员")
+                    .status(1)
+                    .emailVerified(false)
+                    .build();
+
+            userMapper.insert(adminUser);
+
+            // 分配管理员角色给管理员用户
+            userMapper.insertUserRole(adminUser.getId(), adminRole.getId(), tenantId);
+
+            log.info("Created admin user for tenant: {}, username: admin, password: 123456", tenantId);
+        } else {
+            // 如果管理员用户已存在但没有角色，分配管理员角色
+            List<Long> existingRoleIds = userMapper.findRoleIdsByUserId(existingAdmin.getId());
+            if (existingRoleIds.isEmpty() || !existingRoleIds.contains(adminRole.getId())) {
+                userMapper.insertUserRole(existingAdmin.getId(), adminRole.getId(), tenantId);
+                log.info("Assigned admin role to existing admin user for tenant: {}", tenantId);
+            }
         }
 
         log.info("Initialized default roles and permissions for tenant: {}", tenantId);

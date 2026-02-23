@@ -121,7 +121,7 @@
     <!-- Insert Role Permission -->
     <insert id="insertRolePermission">
         INSERT INTO role_permission (role_id, permission_id, tenant_id, created_at)
-        VALUES (#{roleId}, #{permissionId}, (SELECT tenant_id FROM role WHERE id = #{roleId}), NOW())
+        VALUES (#{roleId}, #{permissionId}, #{tenantId}, NOW())
     </insert>
 
     <!-- Delete Role Permissions By Role Id -->
@@ -140,5 +140,10 @@
     <select id="countByStatus" resultType="long">
         SELECT COUNT(*) FROM role WHERE status = #{status}
     </select>
+
+    <!-- Delete By Tenant Id -->
+    <delete id="deleteByTenantId">
+        DELETE FROM role WHERE tenant_id = #{tenantId}
+    </delete>
 
 </mapper>

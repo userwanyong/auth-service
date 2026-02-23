@@ -6,6 +6,7 @@
     <!-- Result Map -->
     <resultMap id="RolePermissionResultMap" type="cn.wanyj.auth.entity.RolePermission">
         <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="roleId" column="role_id"/>
         <result property="permissionId" column="permission_id"/>
         <result property="createdAt" column="created_at"/>
@@ -13,29 +14,29 @@
 
     <!-- Find By Role Id -->
     <select id="findByRoleId" resultMap="RolePermissionResultMap">
-        SELECT id, role_id, permission_id, created_at
+        SELECT id, tenant_id, role_id, permission_id, created_at
         FROM role_permission
         WHERE role_id = #{roleId}
     </select>
 
     <!-- Find By Permission Id -->
     <select id="findByPermissionId" resultMap="RolePermissionResultMap">
-        SELECT id, role_id, permission_id, created_at
+        SELECT id, tenant_id, role_id, permission_id, created_at
         FROM role_permission
         WHERE permission_id = #{permissionId}
     </select>
 
     <!-- Find By Role Id And Permission Id -->
     <select id="findByRoleIdAndPermissionId" resultMap="RolePermissionResultMap">
-        SELECT id, role_id, permission_id, created_at
+        SELECT id, tenant_id, role_id, permission_id, created_at
         FROM role_permission
         WHERE role_id = #{roleId} AND permission_id = #{permissionId}
     </select>
 
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.RolePermission" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO role_permission (role_id, permission_id, created_at)
-        VALUES (#{roleId}, #{permissionId}, NOW())
+        INSERT INTO role_permission (role_id, permission_id, tenant_id, created_at)
+        VALUES (#{roleId}, #{permissionId}, #{tenantId}, NOW())
     </insert>
 
     <!-- Delete By Role Id And Permission Id -->
@@ -63,5 +64,10 @@
     <select id="countByPermissionId" resultType="long">
         SELECT COUNT(*) FROM role_permission WHERE permission_id = #{permissionId}
     </select>
+
+    <!-- Delete By Tenant Id -->
+    <delete id="deleteByTenantId">
+        DELETE FROM role_permission WHERE tenant_id = #{tenantId}
+    </delete>
 
 </mapper>

@@ -19,6 +19,8 @@ public class RolePermission {
 
     private Long id;
 
+    private Long tenantId;
+
     private Long roleId;
 
     private Long permissionId;

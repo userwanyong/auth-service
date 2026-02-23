@@ -77,7 +77,7 @@ public interface RoleMapper {
      * Insert role permission
      * 插入角色权限关联
      */
-    int insertRolePermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId);
+    int insertRolePermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId, @Param("tenantId") Long tenantId);
 
     /**
      * Delete role permissions by role id
@@ -96,4 +96,10 @@ public interface RoleMapper {
      * 统计角色数量
      */
     long countByStatus(@Param("status") Integer status);
+
+    /**
+     * Delete roles by tenant id
+     * 根据租户ID删除所有角色
+     */
+    int deleteByTenantId(@Param("tenantId") Long tenantId);
 }

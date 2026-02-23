@@ -72,4 +72,10 @@ public interface PermissionMapper {
      * 统计权限数量
      */
     long count();
+
+    /**
+     * Delete permissions by tenant id
+     * 根据租户ID删除所有权限
+     */
+    int deleteByTenantId(@Param("tenantId") Long tenantId);
 }

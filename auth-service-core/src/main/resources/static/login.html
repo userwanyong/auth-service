@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Auth Service</title>
+    <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>Auth Service</h1>
+                <p>认证服务管理平台</p>
+            </div>
+
+            <!-- Login Form -->
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">用户名</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="loginUsername" name="username" class="form-control with-icon" required
+                               placeholder="请输入用户名" autocomplete="username">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="loginPassword" name="password" class="form-control with-icon" required
+                               placeholder="请输入密码" autocomplete="current-password">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="loginTenantId">租户</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🏢</span>
+                        <select id="loginTenantId" name="tenantId" class="form-control with-icon" required>
+                            <option value="">请选择租户</option>
+                        </select>
+                    </div>
+                    <small class="form-text">请选择要登录的租户</small>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">登录</button>
+            </form>
+
+            <div class="login-footer">
+                <p>&copy; 2025 Auth Service. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/login.js"></script>
+</body>
+</html>

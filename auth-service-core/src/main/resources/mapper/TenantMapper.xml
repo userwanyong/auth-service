@@ -40,6 +40,16 @@
         ORDER BY id
     </select>
 
+    <!-- Find Active (for login page) -->
+    <select id="findActive" resultMap="TenantResultMap">
+        SELECT id, tenant_code, tenant_name, status, expired_at,
+               max_users, is_platform, created_at, updated_at
+        FROM tenant
+        WHERE status = 1
+          AND (expired_at IS NULL OR expired_at > NOW())
+        ORDER BY id
+    </select>
+
     <!-- Exists By Code -->
     <select id="existsByCode" resultType="boolean">
         SELECT COUNT(*) > 0

@@ -56,6 +56,14 @@ public interface TenantService {
     List<Tenant> getAllTenants();
 
     /**
+     * 获取激活的租户列表（用于登录页面）
+     * 只返回状态为1且未过期的租户
+     *
+     * @return 激活的租户列表
+     */
+    List<Tenant> getActiveTenants();
+
+    /**
      * 检查租户编码是否存在
      *
      * @param tenantCode 租户编码

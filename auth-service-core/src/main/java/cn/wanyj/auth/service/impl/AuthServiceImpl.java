@@ -95,7 +95,7 @@ public class AuthServiceImpl implements AuthService {
         // Insert user role relationship (use ROLE_USER for this tenant)
         Role userRole = userMapper.findRoleByCodeAndTenantId("ROLE_USER", tenantId);
         if (userRole != null) {
-            userMapper.insertUserRole(user.getId(), userRole.getId());
+            userMapper.insertUserRole(user.getId(), userRole.getId(), tenantId);
         } else {
             log.warn("ROLE_USER not found for tenant: {}, skipping role assignment", tenantId);
         }
@@ -377,6 +377,7 @@ public class AuthServiceImpl implements AuthService {
 
         return UserResponse.builder()
                 .id(user.getId())
+                .tenantId(user.getTenantId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .phone(user.getPhone())

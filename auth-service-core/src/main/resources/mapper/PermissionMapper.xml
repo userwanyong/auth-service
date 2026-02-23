@@ -93,4 +93,9 @@
         SELECT COUNT(*) FROM permission
     </select>
 
+    <!-- Delete By Tenant Id -->
+    <delete id="deleteByTenantId">
+        DELETE FROM permission WHERE tenant_id = #{tenantId}
+    </delete>
+
 </mapper>

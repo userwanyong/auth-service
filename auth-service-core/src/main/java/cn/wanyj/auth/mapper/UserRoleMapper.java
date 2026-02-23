@@ -66,4 +66,10 @@ public interface UserRoleMapper {
      * 统计角色的用户数量
      */
     long countByRoleId(@Param("roleId") Long roleId);
+
+    /**
+     * Delete user roles by tenant id
+     * 根据租户ID删除所有用户角色关联
+     */
+    int deleteByTenantId(@Param("tenantId") Long tenantId);
 }

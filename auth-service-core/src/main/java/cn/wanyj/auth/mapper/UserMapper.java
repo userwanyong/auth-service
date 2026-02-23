@@ -64,6 +64,24 @@ public interface UserMapper {
     long countByKeyword(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
 
     /**
+     * Find all users by tenant id
+     * 根据租户ID查找所有用户
+     */
+    List<User> findAllByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find all users with roles by tenant id
+     * 根据租户ID查找所有用户及其角色信息
+     */
+    List<User> findAllByTenantIdWithRoles(@Param("tenantId") Long tenantId);
+
+    /**
+     * Count all users by tenant id
+     * 统计租户下的用户总数
+     */
+    long countAllByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
      * Insert user
      * 插入用户
      */
@@ -109,7 +127,7 @@ public interface UserMapper {
      * Insert user role
      * 插入用户角色关联
      */
-    int insertUserRole(@Param("userId") Long userId, @Param("roleId") Long roleId);
+    int insertUserRole(@Param("userId") Long userId, @Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
     /**
      * Delete user roles by user id
@@ -128,4 +146,10 @@ public interface UserMapper {
      * 根据角色编码和租户ID查找角色
      */
     Role findRoleByCodeAndTenantId(@Param("code") String code, @Param("tenantId") Long tenantId);
+
+    /**
+     * Delete users by tenant id
+     * 根据租户ID删除所有用户
+     */
+    int deleteByTenantId(@Param("tenantId") Long tenantId);
 }
