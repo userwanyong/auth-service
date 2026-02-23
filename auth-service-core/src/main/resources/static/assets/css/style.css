@@ -465,6 +465,31 @@ body {
     margin-bottom: 8px;
 }
 
+/* GitHub Link */
+.github-link {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.github-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: var(--transition);
+    font-size: 14px;
+}
+
+.github-link a:hover {
+    color: var(--primary-color);
+}
+
+.github-icon {
+    fill: currentColor;
+}
+
 /* ===================================
    Components: Table
    =================================== */

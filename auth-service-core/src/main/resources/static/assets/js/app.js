@@ -57,12 +57,8 @@
         // Setup modals
         setupModals();
 
-        // Load initial page based on tenant type
-        if (Auth.isPlatformTenant()) {
-            navigateTo('tenants');
-        } else {
-            navigateTo('dashboard');
-        }
+        // Load initial page - all tenants go to dashboard first
+        navigateTo('dashboard');
     }
 
     /**

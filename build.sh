@@ -1,2 +1,2 @@
 # bash build.sh
-docker build -t wanyj/auth-service:1.2 -f ./Dockerfile .
+docker build -t wanyj/auth-service:2.0 -f ./Dockerfile .
