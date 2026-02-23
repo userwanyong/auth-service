@@ -32,6 +32,9 @@ build/
 .vscode/
 /.claude/
 
+### Local Configuration ###
+.local-config
+
 ### Logs ###
 /logs/
 **/logs/

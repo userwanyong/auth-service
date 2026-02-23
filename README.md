@@ -4,7 +4,7 @@
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.13-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Apache Dubbo](https://img.shields.io/badge/Dubbo-3.3.2-blue.svg)](https://dubbo.apache.org/)
-[![Nacos](https://img.shields.io/badge/Nacos-2.4.2-green.svg)](https://nacos.io/)
+[![Nacos](https://img.shields.io/badge/Nacos-3.1.1-green.svg)](https://nacos.io/)
 [![Java](https://img.shields.io/badge/Java-17-blue.svg)](https://openjdk.org/projects/jdk/17/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -69,11 +69,11 @@
 ## 环境要求
 
 | 组件 | 版本要求 | 说明 |
-|------|----------|------|
-| JDK | 17+ | 编程语言 |
+|------|------|------|
+| JDK | 17+  | 编程语言 |
 | MySQL | 8.0+ | 关系型数据库 |
 | Redis | 6.0+ | 缓存存储 |
-| Nacos | 2.3+ | 服务注册中心 |
+| Nacos | 3.1+ | 服务注册中心 |
 | Maven | 3.6+ | 构建工具 |
 
 ## 快速开始
@@ -373,18 +373,18 @@ auth-service/
 
 ## 技术栈
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
+| 技术 | 版本     | 说明 |
+|------|--------|------|
 | Spring Boot | 3.4.13 | 基础框架 |
-| Apache Dubbo | 3.3.2 | RPC 框架（Triple协议） |
-| Nacos | 2.4.2 | 注册中心 |
-| Spring Security | 6.4.2 | 安全框架 |
+| Apache Dubbo | 3.3.2  | RPC 框架（Triple协议） |
+| Nacos | 3.1.1  | 注册中心 |
+| Spring Security | 6.4.2  | 安全框架 |
 | JWT (jjwt) | 0.12.6 | 令牌生成与验证 |
 | Protobuf | 3.25.2 | RPC 序列化 |
-| MyBatis | 3.0.4 | ORM 框架 |
-| MySQL | 8.0+ | 关系型数据库 |
-| Redis | 6.0+ | 缓存存储 |
-| Java | 17 | 编程语言 |
+| MyBatis | 3.0.4  | ORM 框架 |
+| MySQL | 8.0+   | 关系型数据库 |
+| Redis | 6.0+   | 缓存存储 |
+| Java | 17     | 编程语言 |
 
 ## 核心功能
 

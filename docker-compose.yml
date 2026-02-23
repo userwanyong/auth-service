@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  auth-service:
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:1.2
+    container_name: auth-service-app
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 12123
+      # Redis Configuration
+      SPRING_DATA_REDIS_HOST: 127.0.0.1
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: 12123
+      # Nacos Configuration
+      dubbo.registry.address: nacos://127.0.0.1:8848
+      dubbo.registry.username: nacos
+      dubbo.registry.password: nacos
+      dubbo.metadata-report.address: nacos://127.0.0.1:8848
+      dubbo.metadata-report.username: nacos
+      dubbo.metadata-report.password: nacos
+      # JVM Configuration
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -XX:+PrintGCDetails
+        -XX:+PrintGCTimeStamps
+        -Xlog:gc*:file=/logs/gc.log:time,tags:filecount=10,filesize=100M
+    ports:
+      - "8123:8123"   # REST API
+      - "20880:20880" # Dubbo RPC
+    volumes:
+      - app-logs:/app/logs
+    networks:
+      - auth-network
+
+# Named volumes for data persistence
+volumes:
+  app-logs:
+    driver: local
+
+# Network for service communication
+networks:
+  auth-network:
+    driver: bridge
