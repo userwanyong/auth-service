@@ -1,6 +1,7 @@
 package cn.wanyj.auth.service;
 
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
+import cn.wanyj.auth.dto.request.UpdateUserRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 
@@ -40,6 +41,11 @@ public interface UserService {
      * 更新用户状态
      */
     void updateUserStatus(Long userId, Integer status);
+
+    /**
+     * Update user profile fields
+     */
+    void updateUser(Long userId, UpdateUserRequest request);
 
     /**
      * Delete user

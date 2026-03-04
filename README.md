@@ -90,7 +90,7 @@ version: '3.8'
 
 services:
   auth-service:
-    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:2.0
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:3.0
     container_name: auth-service-app
     restart: unless-stopped
     environment:

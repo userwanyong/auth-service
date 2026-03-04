@@ -392,13 +392,36 @@
             Toast.error('请输入密码');
             return;
         }
-
         try {
-            // For now, we only support updating user status
-            // Creating new user would need registration endpoint
             if (id) {
-                await API.Users.updateStatus(id, status);
+                await API.Users.update(id, {
+                    username,
+                    password: password || null,
+                    email: email || null,
+                    nickname: nickname || null,
+                    status
+                });
                 Toast.success('用户更新成功');
+            } else {
+                const currentUser = Auth.getCurrentUser();
+                if (!currentUser || currentUser.tenantId === null || currentUser.tenantId === undefined) {
+                    throw new Error('无法获取当前租户信息');
+                }
+
+                const registerResult = await API.Auth.register({
+                    username,
+                    password,
+                    tenantId: currentUser.tenantId,
+                    email: email || null,
+                    nickname: nickname || null
+                });
+
+                // Register defaults to enabled status. If disabled is selected, sync status after creation.
+                if (status !== 1 && registerResult && registerResult.user && registerResult.user.id) {
+                    await API.Users.updateStatus(registerResult.user.id, status);
+                }
+
+                Toast.success('用户创建成功');
             }
             closeModal('userModal');
             await loadUsers();
@@ -724,7 +747,7 @@
                 <td>${t.status === 1 ?
                     '<span class="badge badge-success">启用</span>' :
                     '<span class="badge badge-danger">禁用</span>'}</td>
-                <td>${t.currentUserCount || 0} / ${t.maxUsers || '∞'}</td>
+                <td>${t.currentUserCount || 0} / ${t.maxUsers || '-'}</td>
                 <td>${t.expiredAt ? new Date(t.expiredAt).toLocaleDateString() : '-'}</td>
                 <td>
                     <div class="action-buttons">

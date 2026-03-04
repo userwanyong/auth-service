@@ -2,6 +2,7 @@ package cn.wanyj.auth.service.impl;
 
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
+import cn.wanyj.auth.dto.request.UpdateUserRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.entity.Role;
@@ -15,6 +16,7 @@ import cn.wanyj.auth.mapper.UserRoleMapper;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UserResponse getUserById(Long id) {
@@ -142,6 +145,60 @@ public class UserServiceImpl implements UserService {
         userMapper.update(user);
 
         log.info("User status updated successfully: {}", userId);
+    }
+
+    @Override
+    @Transactional
+    public void updateUser(Long userId, UpdateUserRequest request) {
+        log.info("Updating user profile: {}", userId);
+
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        User user = userMapper.findById(userId);
+        if (user == null || !tenantId.equals(user.getTenantId())) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        String username = request.getUsername() != null ? request.getUsername().trim() : null;
+        if (username != null && !username.isEmpty() && !username.equals(user.getUsername())) {
+            if (userMapper.existsByUsername(username, tenantId)) {
+                throw new BusinessException(ErrorCode.USERNAME_EXISTS);
+            }
+            user.setUsername(username);
+        }
+
+        String email = request.getEmail() != null ? request.getEmail().trim() : null;
+        if (email != null && email.isEmpty()) {
+            email = null;
+        }
+        if (email != null && !email.equals(user.getEmail()) && userMapper.existsByEmail(email, tenantId)) {
+            throw new BusinessException(ErrorCode.EMAIL_EXISTS);
+        }
+        user.setEmail(email);
+
+        if (request.getPhone() != null) {
+            String phone = request.getPhone().trim();
+            user.setPhone(phone.isEmpty() ? null : phone);
+        }
+
+        String nickname = request.getNickname() != null ? request.getNickname().trim() : null;
+        user.setNickname((nickname != null && nickname.isEmpty()) ? null : nickname);
+
+        if (request.getAvatar() != null) {
+            String avatar = request.getAvatar().trim();
+            user.setAvatar(avatar.isEmpty() ? null : avatar);
+        }
+
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+
+        String password = request.getPassword();
+        if (password != null && !password.isBlank()) {
+            user.setPassword(passwordEncoder.encode(password));
+        }
+
+        userMapper.update(user);
+        log.info("User profile updated successfully: {}", userId);
     }
 
     @Override

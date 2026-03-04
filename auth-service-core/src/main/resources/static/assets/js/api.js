@@ -200,6 +200,12 @@ const API = (function() {
             }).then(handleResponse),
 
         /**
+         * Update user profile
+         * PUT /api/users/{id}
+         */
+        update: (id, data) => put(`/users/${id}`, data),
+
+        /**
          * Delete user
          * DELETE /api/users/{id}
          */

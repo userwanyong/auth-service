@@ -1,6 +1,7 @@
 package cn.wanyj.auth.controller;
 
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
+import cn.wanyj.auth.dto.request.UpdateUserRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.ApiResponse;
@@ -84,6 +85,20 @@ public class UserController {
         log.info("Update user status: {}, status={}", id, status);
         userService.updateUserStatus(id, status);
         return ResponseEntity.ok(ApiResponse.success(200, "用户状态更新成功", null));
+    }
+
+    /**
+     * 更新用户信息
+     * PUT /api/users/{id}
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> updateUser(
+            @PathVariable Long id,
+            @RequestBody UpdateUserRequest request) {
+        log.info("Update user profile: {}", id);
+        userService.updateUser(id, request);
+        return ResponseEntity.ok(ApiResponse.success(200, "用户更新成功", null));
     }
 
     /**
