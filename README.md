@@ -340,6 +340,12 @@ auth-service/
 
 ## 数据库设计
 
+### ID 策略说明
+
+- `user.id`：由应用侧 `uid-generator` 生成
+- `tenant/role/permission/user_role/role_permission`：自增主键
+- `uid_generator_worker_id`：用于分布式实例分配唯一 workerId，避免多实例发号冲突
+
 ### 表结构
 
 #### tenant (租户表)

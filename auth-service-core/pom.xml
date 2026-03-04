@@ -105,6 +105,13 @@
             <version>3.25.2</version>
         </dependency>
 
+        <!-- UID Generator (Snowflake strategy based on Baidu uid-generator) -->
+        <dependency>
+            <groupId>io.github.xiapxx</groupId>
+            <artifactId>uid-generator-spring-boot-starter</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

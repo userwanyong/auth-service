@@ -13,6 +13,7 @@ import cn.wanyj.auth.mapper.TenantMapper;
 import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.mapper.UserRoleMapper;
 import cn.wanyj.auth.service.TenantService;
+import io.github.xiapxx.uid.generator.api.UidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -39,6 +40,7 @@ public class TenantServiceImpl implements TenantService {
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PasswordEncoder passwordEncoder;
+    private final UidGenerator uidGenerator;
 
     @Override
     public boolean isValidTenant(Long tenantId) {
@@ -282,6 +284,7 @@ public class TenantServiceImpl implements TenantService {
         User existingAdmin = userMapper.findByUsername("admin", tenantId);
         if (existingAdmin == null) {
             User adminUser = User.builder()
+                    .id(uidGenerator.getUID())
                     .tenantId(tenantId)
                     .username("admin")
                     .password(passwordEncoder.encode("123456"))

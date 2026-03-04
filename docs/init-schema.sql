@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS `tenant` (
 -- Table: user (用户表)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `user` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  `id` BIGINT NOT NULL COMMENT '用户ID（雪花ID）',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `username` VARCHAR(50) NOT NULL COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '密码（bcrypt加密）',
@@ -127,6 +127,14 @@ CREATE TABLE IF NOT EXISTS `role_permission` (
   KEY `idx_role_id` (`role_id`),
   KEY `idx_permission_id` (`permission_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色权限关联表';
+
+-- ============================================
+-- Table: uid_generator_worker_id (UID Generator worker allocation)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `uid_generator_worker_id` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='uid-generator worker id分配表';
 
 -- ============================================
 -- Initial Data (初始数据)

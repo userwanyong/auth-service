@@ -161,10 +161,10 @@
     </select>
 
     <!-- Insert -->
-    <insert id="insert" parameterType="cn.wanyj.auth.entity.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user (tenant_id, username, password, email, phone, nickname, avatar,
+    <insert id="insert" parameterType="cn.wanyj.auth.entity.User">
+        INSERT INTO user (id, tenant_id, username, password, email, phone, nickname, avatar,
                          status, email_verified, last_login_at, created_at, updated_at)
-        VALUES (#{tenantId}, #{username}, #{password}, #{email}, #{phone}, #{nickname}, #{avatar},
+        VALUES (#{id}, #{tenantId}, #{username}, #{password}, #{email}, #{phone}, #{nickname}, #{avatar},
                 #{status}, #{emailVerified}, #{lastLoginAt}, NOW(), NOW())
     </insert>
 

@@ -17,6 +17,7 @@ import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.service.AuthService;
 import cn.wanyj.auth.service.TokenService;
 import cn.wanyj.auth.service.TenantService;
+import io.github.xiapxx.uid.generator.api.UidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +43,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenService tokenService;
     private final TenantService tenantService;
+    private final UidGenerator uidGenerator;
 
     @Override
     @Transactional
@@ -77,6 +79,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Create new user with tenantId
         User user = User.builder()
+                .id(uidGenerator.getUID())
                 .tenantId(tenantId)
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
