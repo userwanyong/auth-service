@@ -61,7 +61,7 @@ const Auth = (function() {
     function isPlatformTenant() {
         const user = getCurrentUser();
         if (!user || user.tenantId === null || user.tenantId === undefined) return false;
-        return user.tenantId === 0;
+        return String(user.tenantId) === '0';
     }
 
     /**

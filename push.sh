@@ -8,7 +8,7 @@ set -e
 ALIYUN_REGISTRY="registry.cn-wulanchabu.aliyuncs.com"
 NAMESPACE="wanyj"
 IMAGE_NAME="auth-service"
-IMAGE_TAG="3.1"
+IMAGE_TAG="3.2"
 
 # 读取本地配置文件
 if [ -f ".local-config" ]; then

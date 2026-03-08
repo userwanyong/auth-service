@@ -15,6 +15,14 @@
     let currentUsersPage = 1;
     let currentUsersKeyword = null;
 
+    function isPlatformTenantId(tenantId) {
+        return String(tenantId) === '0';
+    }
+
+    function quoteJsString(value) {
+        return JSON.stringify(String(value));
+    }
+
     /**
      * Initialize application
      */
@@ -29,7 +37,7 @@
             const userResponse = await API.Auth.getCurrentUser();
             console.log('Current user response:', userResponse);
             console.log('User tenantId:', userResponse.tenantId);
-            console.log('Is platform tenant:', userResponse.tenantId === 0);
+            console.log('Is platform tenant:', isPlatformTenantId(userResponse.tenantId));
             localStorage.setItem('auth_user', JSON.stringify(userResponse));
         } catch (error) {
             console.error('Failed to fetch user info:', error);
@@ -73,7 +81,7 @@
         document.getElementById('userName').textContent = user.username || '-';
 
         // Display tenant info more user-friendly
-        const tenantDisplay = user.tenantId === 0 ? '平台租户' : `租户ID: ${user.tenantId}`;
+        const tenantDisplay = isPlatformTenantId(user.tenantId) ? '平台租户' : `租户ID: ${user.tenantId}`;
         document.getElementById('userTenant').textContent = tenantDisplay;
 
         // Header role badge
@@ -269,7 +277,7 @@
                 document.getElementById('statPermissions').textContent = permissionsResult.length || 0;
             }
         } catch (error) {
-            Toast.error('加载仪表盘数据失败: ' + error.message);
+            Toast.error('加载仪表盘数据失�? ' + error.message);
         }
     }
 
@@ -303,12 +311,12 @@
                     '<span class="badge badge-danger">禁用</span>'}</td>
                 <td>${Array.isArray(user.roles) && user.roles.length > 0 ? user.roles.map(r =>
                     `<span class="badge badge-info">${r.replace('ROLE_', '')}</span>`
-                ).join(' ') : '<span class="text-muted">未分配</span>'}</td>
+                ).join(' ') : '<span class="text-muted">Unassigned</span>'}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-outline" onclick="App.editUser(${user.id})">编辑</button>
-                        <button class="btn btn-sm btn-secondary" onclick="App.assignUserRoles(${user.id})">角色</button>
-                        <button class="btn btn-sm btn-danger" onclick="App.deleteUser(${user.id})">删除</button>
+                        <button class="btn btn-sm btn-outline" onclick='App.editUser(${quoteJsString(user.id)})'>编辑</button>
+                        <button class="btn btn-sm btn-secondary" onclick='App.assignUserRoles(${quoteJsString(user.id)})'>角色</button>
+                        <button class="btn btn-sm btn-danger" onclick='App.deleteUser(${quoteJsString(user.id)})'>删除</button>
                     </div>
                 </td>
             </tr>
@@ -324,9 +332,9 @@
         }
 
         let html = `
-            <button ${currentUsersPage === 1 ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage - 1})">上一页</button>
-            <span class="page-info">第 ${currentUsersPage} / ${totalPages} 页</span>
-            <button ${currentUsersPage >= totalPages ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage + 1})">下一页</button>
+            <button ${currentUsersPage === 1 ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage - 1})">Prev</button>
+            <span class="page-info">Page ${currentUsersPage} / ${totalPages}</span>
+            <button ${currentUsersPage >= totalPages ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage + 1})">Next</button>
         `;
         container.innerHTML = html;
     }
@@ -367,7 +375,7 @@
         document.getElementById('userId').value = user ? user.id : '';
         document.getElementById('userUsername').value = user ? user.username : '';
         document.getElementById('userPassword').value = '';
-        document.getElementById('userPassword').placeholder = user ? '留空则不修改密码' : '请输入密码';
+        document.getElementById('userPassword').placeholder = user ? 'Leave blank to keep current password' : 'Enter password';
         document.getElementById('userEmail').value = user ? (user.email || '') : '';
         document.getElementById('userNickname').value = user ? (user.nickname || '') : '';
         document.getElementById('userStatus').value = user ? user.status : 1;
@@ -389,7 +397,7 @@
         }
 
         if (!id && !password) {
-            Toast.error('请输入密码');
+            Toast.error('Enter password');
             return;
         }
         try {
@@ -475,7 +483,7 @@
     async function saveUserRoles() {
         const userId = document.getElementById('userRolesUserId').value;
         const checkboxes = document.querySelectorAll('input[name="userRoles"]:checked');
-        const roleIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        const roleIds = Array.from(checkboxes).map(cb => cb.value);
 
         try {
             await API.Users.assignRoles(userId, roleIds);
@@ -526,9 +534,9 @@
                     '<span class="badge badge-danger">禁用</span>'}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-outline" onclick="App.editRole(${role.id})">编辑</button>
-                        <button class="btn btn-sm btn-secondary" onclick="App.rolePermissions(${role.id})">权限</button>
-                        <button class="btn btn-sm btn-danger" onclick="App.deleteRole(${role.id})">删除</button>
+                        <button class="btn btn-sm btn-outline" onclick='App.editRole(${quoteJsString(role.id)})'>编辑</button>
+                        <button class="btn btn-sm btn-secondary" onclick='App.rolePermissions(${quoteJsString(role.id)})'>权限</button>
+                        <button class="btn btn-sm btn-danger" onclick='App.deleteRole(${quoteJsString(role.id)})'>删除</button>
                     </div>
                 </td>
             </tr>
@@ -628,7 +636,7 @@
     async function saveRolePermissions() {
         const roleId = document.getElementById('rolePermissionsRoleId').value;
         const checkboxes = document.querySelectorAll('#permissionsCheckboxes input:checked');
-        const permissionIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        const permissionIds = Array.from(checkboxes).map(cb => cb.value);
 
         try {
             await API.Roles.assignPermissions(roleId, permissionIds);
@@ -665,7 +673,7 @@
                 <td>${escapeHtml(p.action)}</td>
                 <td>${escapeHtml(p.description || '-')}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger" onclick="App.deletePermission(${p.id})">删除</button>
+                    <button class="btn btn-sm btn-danger" onclick='App.deletePermission(${quoteJsString(p.id)})'>删除</button>
                 </td>
             </tr>
         `).join('');
@@ -751,8 +759,8 @@
                 <td>${t.expiredAt ? new Date(t.expiredAt).toLocaleDateString() : '-'}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-outline" onclick="App.editTenant(${t.id})">编辑</button>
-                        ${t.id !== 0 ? `<button class="btn btn-sm btn-danger" onclick="App.deleteTenant(${t.id})">删除</button>` : ''}
+                        <button class="btn btn-sm btn-outline" onclick='App.editTenant(${quoteJsString(t.id)})'>编辑</button>
+                        ${!isPlatformTenantId(t.id) ? `<button class="btn btn-sm btn-danger" onclick='App.deleteTenant(${quoteJsString(t.id)})'>删除</button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -818,7 +826,7 @@
     }
 
     async function editTenant(id) {
-        const tenant = tenantsData.find(t => t.id === id);
+        const tenant = tenantsData.find(t => String(t.id) === String(id));
         if (tenant) {
             openTenantModal(tenant);
         }
@@ -834,14 +842,14 @@
             tenantName = `ID: ${id}`;
         }
 
-        const warningMessage = `确定要删除租户「${tenantName}」吗？\n\n` +
-            `此操作将同时删除该租户下的所有数据，包括：\n` +
-            `• 所有用户\n` +
-            `• 所有角色\n` +
-            `• 所有权限\n` +
-            `• 用户和角色的关联关系\n` +
-            `• 角色和权限的关联关系\n\n` +
-            `此操作不可恢复！`;
+        const warningMessage = `Delete tenant "${tenantName}"?\n\n` +
+            `This will also delete all tenant data, including:\n` +
+            `- all users\n` +
+            `- all roles\n` +
+            `- all permissions\n` +
+            `- user-role relations\n` +
+            `- role-permission relations\n\n` +
+            `This action cannot be undone.`;
 
         if (!confirm(warningMessage)) return;
 
@@ -870,10 +878,10 @@
             toast.className = `toast toast-${type}`;
 
             const icons = {
-                success: '✓',
-                error: '✕',
-                warning: '⚠',
-                info: 'ℹ'
+                success: 'OK',
+                error: 'X',
+                warning: '!',
+                info: 'i'
             };
 
             toast.innerHTML = `
@@ -936,3 +944,6 @@
         init();
     }
 })();
+
+
+

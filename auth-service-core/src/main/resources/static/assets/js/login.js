@@ -35,9 +35,8 @@
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const tenantIdValue = document.getElementById('loginTenantId').value;
-            const tenantId = parseInt(tenantIdValue);
 
-            console.log('Login form values:', { username, passwordLength: password?.length, tenantIdValue, tenantId });
+            console.log('Login form values:', { username, passwordLength: password?.length, tenantIdValue });
 
             // Check if tenantIdValue is empty (not falsy, since 0 is a valid ID)
             if (!username || !password || tenantIdValue === '') {
@@ -51,7 +50,7 @@
             submitBtn.textContent = '登录中...';
 
             try {
-                const tokenResponse = await API.Auth.login(username, password, tenantId);
+                const tokenResponse = await API.Auth.login(username, password, tenantIdValue);
 
                 // Save token first (needed for subsequent API calls)
                 // User info will be fetched on the dashboard
