@@ -2,6 +2,8 @@ package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.LoginRequest;
+import cn.wanyj.auth.dto.request.RegisterRequest;
+import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.BusinessException;
@@ -13,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +39,46 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     private final TokenService tokenService;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
+
+    @Override
+    public RegisterRpcResult register(RegisterRpcRequest request) {
+        log.info("RPC register: username={}, tenantId={}", request.getUsername(), request.getTenantId());
+        try {
+            TokenResponse tokenResponse = authService.register(
+                RegisterRequest.builder()
+                    .username(request.getUsername())
+                    .password(request.getPassword())
+                    .tenantId(request.getTenantId())
+                    .email(emptyToNull(request.getEmail()))
+                    .phone(emptyToNull(request.getPhone()))
+                    .nickname(emptyToNull(request.getNickname()))
+                    .build()
+            );
+
+            return RegisterRpcResult.newBuilder()
+                .setSuccess(true)
+                .setMessage("注册成功")
+                .setToken(TokenRpcResponse.newBuilder()
+                    .setAccessToken(tokenResponse.getAccessToken())
+                    .setRefreshToken(tokenResponse.getRefreshToken())
+                    .setExpiresIn(tokenResponse.getExpiresIn())
+                    .build())
+                .setUser(convertToProtobuf(tokenResponse.getUser()))
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Registration failed: {}", e.getMessage());
+            return RegisterRpcResult.newBuilder()
+                .setSuccess(false)
+                .setMessage(e.getMessage())
+                .build();
+        } catch (Exception e) {
+            log.error("Registration error", e);
+            return RegisterRpcResult.newBuilder()
+                .setSuccess(false)
+                .setMessage("注册失败")
+                .build();
+        }
+    }
 
     @Override
     public AuthResult authenticate(LoginRpcRequest request) {
@@ -228,6 +272,73 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         }
     }
 
+    @Override
+    public UserPageResponse searchUsers(SearchUsersRequest request) {
+        int page = request.getPage() > 0 ? request.getPage() : 1;
+        int size = request.getSize() > 0 ? request.getSize() : 10;
+        String keyword = emptyToNull(request.getKeyword());
+
+        log.info("RPC searchUsers: tenantId={}, page={}, size={}, keyword={}",
+            request.getTenantId(), page, size, keyword);
+        try {
+            PageResponse<UserResponse> pageResponse = searchUsersByTenant(keyword, request.getTenantId(), page, size);
+
+            UserPageResponse.Builder builder = UserPageResponse.newBuilder()
+                .setTotal(pageResponse.getTotal() != null ? pageResponse.getTotal() : 0L)
+                .setPage(pageResponse.getPage() != null ? pageResponse.getPage() : page)
+                .setSize(pageResponse.getSize() != null ? pageResponse.getSize() : size);
+
+            if (pageResponse.getItems() != null) {
+                builder.addAllItems(pageResponse.getItems().stream()
+                    .map(this::convertToProtobuf)
+                    .collect(Collectors.toList()));
+            }
+
+            return builder.build();
+        } catch (BusinessException e) {
+            log.warn("Search users failed: {}", e.getMessage());
+            return UserPageResponse.getDefaultInstance();
+        } catch (Exception e) {
+            log.error("Search users error", e);
+            return UserPageResponse.getDefaultInstance();
+        }
+    }
+
+    private PageResponse<UserResponse> searchUsersByTenant(String keyword, Long tenantId, int page, int size) {
+        List<cn.wanyj.auth.entity.User> users;
+        long total;
+
+        if (keyword != null && !keyword.isBlank()) {
+            users = userMapper.findByKeyword(keyword, tenantId);
+            total = userMapper.countByKeyword(keyword, tenantId);
+        } else {
+            users = userMapper.findAllByTenantIdWithRoles(tenantId);
+            total = userMapper.countAllByTenantId(tenantId);
+        }
+
+        int start = Math.max(0, (page - 1) * size);
+        if (start >= users.size()) {
+            return PageResponse.<UserResponse>builder()
+                .total(total)
+                .page(page)
+                .size(size)
+                .items(Collections.emptyList())
+                .build();
+        }
+
+        int end = Math.min(start + size, users.size());
+        List<UserResponse> items = users.subList(start, end).stream()
+            .map(this::convertToSimpleUserResponse)
+            .collect(Collectors.toList());
+
+        return PageResponse.<UserResponse>builder()
+            .total(total)
+            .page(page)
+            .size(size)
+            .items(items)
+            .build();
+    }
+
     private UserRpcResponse convertToProtobuf(UserResponse user) {
         return UserRpcResponse.newBuilder()
             .setId(user.getId())
@@ -241,6 +352,17 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 ? user.getRoles()
                 : java.util.Collections.emptyList())
             .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : java.util.Collections.emptyList())
+            .build();
+    }
+
+    private UserRpcResponse convertToProtobuf(TokenResponse.UserInfo user) {
+        return UserRpcResponse.newBuilder()
+            .setId(user.getId())
+            .setUsername(user.getUsername())
+            .setEmail(user.getEmail() != null ? user.getEmail() : "")
+            .setNickname(user.getNickname() != null ? user.getNickname() : "")
+            .setAvatar(user.getAvatar() != null ? user.getAvatar() : "")
+            .addAllRoles(user.getRoles() != null ? user.getRoles() : java.util.Collections.emptySet())
             .build();
     }
 
@@ -262,5 +384,32 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 .distinct()
                 .collect(Collectors.toList()))
             .build();
+    }
+
+    private UserResponse convertToSimpleUserResponse(cn.wanyj.auth.entity.User user) {
+        return UserResponse.builder()
+            .id(user.getId())
+            .tenantId(user.getTenantId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .phone(user.getPhone())
+            .nickname(user.getNickname())
+            .avatar(user.getAvatar())
+            .status(user.getStatus())
+            .emailVerified(user.getEmailVerified())
+            .lastLoginAt(user.getLastLoginAt())
+            .createdAt(user.getCreatedAt())
+            .roles(user.getRoles() != null
+                ? user.getRoles().stream().map(r -> r.getCode()).collect(Collectors.toSet())
+                : Collections.emptySet())
+            .permissions(Collections.emptySet())
+            .build();
+    }
+
+    private String emptyToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value;
     }
 }

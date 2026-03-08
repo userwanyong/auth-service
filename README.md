@@ -90,7 +90,7 @@ version: '3.8'
 
 services:
   auth-service:
-    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:3.0
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:3.1
     container_name: auth-service-app
     restart: unless-stopped
     environment:
@@ -262,6 +262,7 @@ mvn spring-boot:run -pl auth-service-core
 
 | RPC 方法 | 描述 | 请求 | 响应 |
 |----------|------|------|------|
+| `register` | 注册用户并自动登录 | `RegisterRpcRequest` | `RegisterRpcResult` |
 | `authenticate` | 验证用户凭证 | `LoginRpcRequest` | `AuthResult` |
 | `getUserById` | 根据ID获取用户 | `UserByIdRequest` | `UserRpcResponse` |
 | `getUserByUsername` | 根据用户名获取用户 | `UserByUsernameRequest` | `UserRpcResponse` |
@@ -269,6 +270,7 @@ mvn spring-boot:run -pl auth-service-core
 | `hasRole` | 检查用户角色 | `RoleCheckRequest` | `BoolValue` |
 | `getUserPermissions` | 获取用户权限列表 | `UserPermissionsRequest` | `StringListResponse` |
 | `getUserRoles` | 获取用户角色列表 | `UserRolesRequest` | `StringListResponse` |
+| `searchUsers` | 分页查询用户 | `SearchUsersRequest` | `UserPageResponse` |
 
 #### TokenRpcServiceProtobuf
 
