@@ -76,6 +76,18 @@ public interface UserMapper {
     List<User> findAllByTenantIdWithRoles(@Param("tenantId") Long tenantId);
 
     /**
+     * Find all users with roles and permissions by tenant id
+     * 根据租户ID查找所有用户及其角色和权限信息
+     */
+    List<User> findAllByTenantIdWithRolesAndPermissions(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find users by keyword with roles and permissions
+     * 根据关键字搜索用户及其角色和权限信息
+     */
+    List<User> findByKeywordWithRolesAndPermissions(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
+
+    /**
      * Count all users by tenant id
      * 统计租户下的用户总数
      */

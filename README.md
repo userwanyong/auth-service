@@ -258,6 +258,8 @@ mvn spring-boot:run -pl auth-service-core
 </dependency>
 ```
 
+> **注意**：请求消息中的 ID 字段（如 `userId`、`tenantId`、`roleId` 等）均使用 `string` 类型，以避免 JavaScript 等弱类型语言中大整数（如雪花ID）的精度丢失问题。调用时直接传字符串即可。
+
 #### AuthRpcServiceProtobuf
 
 | RPC 方法 | 描述 | 请求 | 响应 |
@@ -271,14 +273,47 @@ mvn spring-boot:run -pl auth-service-core
 | `getUserPermissions` | 获取用户权限列表 | `UserPermissionsRequest` | `StringListResponse` |
 | `getUserRoles` | 获取用户角色列表 | `UserRolesRequest` | `StringListResponse` |
 | `searchUsers` | 分页查询用户 | `SearchUsersRequest` | `UserPageResponse` |
+| `refreshToken` | 刷新访问令牌 | `RefreshTokenRpcRequest` | `TokenRpcResponse` |
+| `logout` | 用户登出 | `LogoutRpcRequest` | `OperationResult` |
+| `changePassword` | 修改密码 | `ChangePasswordRpcRequest` | `OperationResult` |
 
 #### TokenRpcServiceProtobuf
 
 | RPC 方法 | 描述 | 请求 | 响应 |
 |----------|------|------|------|
 | `generateToken` | 为用户生成令牌 | `TokenGenerationRequest` | `TokenRpcResponse` |
-| `parseToken` | 解析令牌获取用户信息 | `StringValue` | `TokenValidationResult` |
-| `revokeAllTokens` | 撤销用户所有令牌 | `Int64Value` | `Empty` |
+| `parseToken` | 解析令牌获取用户信息 | `ParseTokenRpcRequest` | `TokenValidationResult` |
+| `revokeAllTokens` | 撤销用户所有令牌 | `RevokeAllTokensRpcRequest` | `Empty` |
+
+#### UserRpcServiceProtobuf
+
+| RPC 方法 | 描述 | 请求 | 响应 |
+|----------|------|------|------|
+| `updateUser` | 更新用户信息 | `UpdateUserRpcRequest` | `OperationResult` |
+| `updateUserStatus` | 更新用户状态 | `UpdateUserStatusRpcRequest` | `OperationResult` |
+| `assignRoles` | 为用户分配角色 | `AssignRolesRpcRequest` | `OperationResult` |
+| `deleteUser` | 删除用户 | `DeleteUserRpcRequest` | `OperationResult` |
+
+#### RoleRpcServiceProtobuf
+
+| RPC 方法 | 描述 | 请求 | 响应 |
+|----------|------|------|------|
+| `getAllRoles` | 获取所有角色 | `GetAllRolesRequest` | `RoleListResponse` |
+| `getRoleByCode` | 根据编码获取角色 | `GetRoleByCodeRequest` | `RoleRpcResponse` |
+| `getRoleById` | 根据ID获取角色 | `GetRoleByIdRequest` | `RoleRpcResponse` |
+| `createRole` | 创建角色 | `CreateRoleRpcRequest` | `RoleRpcResponse` |
+| `updateRole` | 更新角色 | `UpdateRoleRpcRequest` | `OperationResult` |
+| `deleteRole` | 删除角色 | `DeleteRoleRpcRequest` | `OperationResult` |
+| `assignPermissions` | 为角色分配权限 | `AssignPermissionsRpcRequest` | `OperationResult` |
+
+#### PermissionRpcServiceProtobuf
+
+| RPC 方法 | 描述 | 请求 | 响应 |
+|----------|------|------|------|
+| `getAllPermissions` | 获取所有权限 | `GetAllPermissionsRequest` | `PermissionListResponse` |
+| `getPermissionById` | 根据ID获取权限 | `GetPermissionByIdRequest` | `PermissionRpcResponse` |
+| `createPermission` | 创建权限 | `CreatePermissionRpcRequest` | `PermissionRpcResponse` |
+| `deletePermission` | 删除权限 | `DeletePermissionRpcRequest` | `OperationResult` |
 
 #### 调用示例
 
@@ -781,7 +816,7 @@ private AuthRpcServiceProtobuf authRpcService;
 
 // 解析令牌获取用户信息
 TokenValidationResult result = authRpcService.parseToken(
-    StringValue.newBuilder().setValue(token).build()
+    ParseTokenRpcRequest.newBuilder().setAccessToken(token).build()
 );
 ```
 

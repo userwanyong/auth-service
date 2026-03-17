@@ -150,17 +150,23 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateUser(Long userId, UpdateUserRequest request) {
-        log.info("Updating user profile: {}", userId);
-
         Long tenantId = SecurityUtils.getCurrentTenantId();
+        updateUser(userId, tenantId, request);
+    }
+
+    @Override
+    @Transactional
+    public void updateUser(Long userId, Long tenantId, UpdateUserRequest request) {
+        log.info("Updating user profile: {} in tenant: {}", userId, tenantId);
+
         User user = userMapper.findById(userId);
-        if (user == null || !tenantId.equals(user.getTenantId())) {
+        if (user == null || (tenantId != null && !tenantId.equals(user.getTenantId()))) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         String username = request.getUsername() != null ? request.getUsername().trim() : null;
         if (username != null && !username.isEmpty() && !username.equals(user.getUsername())) {
-            if (userMapper.existsByUsername(username, tenantId)) {
+            if (tenantId != null && userMapper.existsByUsername(username, tenantId)) {
                 throw new BusinessException(ErrorCode.USERNAME_EXISTS);
             }
             user.setUsername(username);
@@ -170,7 +176,7 @@ public class UserServiceImpl implements UserService {
         if (email != null && email.isEmpty()) {
             email = null;
         }
-        if (email != null && !email.equals(user.getEmail()) && userMapper.existsByEmail(email, tenantId)) {
+        if (email != null && !email.equals(user.getEmail()) && tenantId != null && userMapper.existsByEmail(email, tenantId)) {
             throw new BusinessException(ErrorCode.EMAIL_EXISTS);
         }
         user.setEmail(email);
@@ -198,7 +204,7 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.update(user);
-        log.info("User profile updated successfully: {}", userId);
+        log.info("User profile updated successfully: {} in tenant: {}", userId, tenantId);
     }
 
     @Override

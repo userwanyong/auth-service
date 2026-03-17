@@ -48,6 +48,12 @@ public interface UserService {
     void updateUser(Long userId, UpdateUserRequest request);
 
     /**
+     * Update user profile fields with explicit tenantId (for RPC context)
+     * 更新用户资料（带显式租户ID，用于RPC上下文）
+     */
+    void updateUser(Long userId, Long tenantId, UpdateUserRequest request);
+
+    /**
      * Delete user
      * 删除用户
      */

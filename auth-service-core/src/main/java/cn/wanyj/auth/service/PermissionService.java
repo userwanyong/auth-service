@@ -29,6 +29,12 @@ public interface PermissionService {
     PermissionResponse createPermission(String code, String name, String resource, String action, String description);
 
     /**
+     * Create new permission with explicit tenantId (for RPC context)
+     * 创建新权限（带显式租户ID，用于RPC上下文）
+     */
+    PermissionResponse createPermission(String code, String name, String resource, String action, String description, Long tenantId);
+
+    /**
      * Delete permission by id
      * 根据ID删除权限
      */

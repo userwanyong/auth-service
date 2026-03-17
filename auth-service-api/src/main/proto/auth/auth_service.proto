@@ -13,14 +13,14 @@ option java_multiple_files = true;
 message LoginRpcRequest {
   string username = 1;
   string password = 2;
-  int64 tenantId = 3;  // Tenant ID for multi-tenant support
+  string tenantId = 3;
 }
 
 // Register request
 message RegisterRpcRequest {
   string username = 1;
   string password = 2;
-  int64 tenantId = 3;
+  string tenantId = 3;
   string email = 4;
   string phone = 5;
   string nickname = 6;
@@ -50,7 +50,7 @@ message TokenValidationResult {
   repeated string roles = 4;
   repeated string permissions = 5;
   int64 expiresAt = 6;
-  int64 tenantId = 7;  // Tenant ID from token
+  int64 tenantId = 7;
 }
 
 // User information response
@@ -75,53 +75,53 @@ message TokenRpcResponse {
 
 // Permission check request
 message PermissionCheckRequest {
-  int64 userId = 1;
+  string userId = 1;
   string permission = 2;
-  int64 tenantId = 3;  // Tenant ID for multi-tenant support
+  string tenantId = 3;
 }
 
 // Role check request
 message RoleCheckRequest {
-  int64 userId = 1;
+  string userId = 1;
   string role = 2;
-  int64 tenantId = 3;  // Tenant ID for multi-tenant support
+  string tenantId = 3;
 }
 
 // User by ID request
 message UserByIdRequest {
-  int64 userId = 1;
-  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+  string userId = 1;
+  string tenantId = 2;
 }
 
 // User by username request
 message UserByUsernameRequest {
   string username = 1;
-  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+  string tenantId = 2;
 }
 
 // User permissions request
 message UserPermissionsRequest {
-  int64 userId = 1;
-  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+  string userId = 1;
+  string tenantId = 2;
 }
 
 // User roles request
 message UserRolesRequest {
-  int64 userId = 1;
-  int64 tenantId = 2;  // Tenant ID for multi-tenant support
+  string userId = 1;
+  string tenantId = 2;
 }
 
 // Token generation request
 message TokenGenerationRequest {
-  int64 userId = 1;
+  string userId = 1;
   int64 expiration = 2;
-  int64 tenantId = 3;  // Tenant ID for multi-tenant support
+  string tenantId = 3;
 }
 
 // Search users request
 message SearchUsersRequest {
   string keyword = 1;
-  int64 tenantId = 2;
+  string tenantId = 2;
   int32 page = 3;
   int32 size = 4;
 }
@@ -139,61 +139,235 @@ message StringListResponse {
   repeated string values = 1;
 }
 
+// ==================== User Management Messages ====================
+
+// Update user request
+message UpdateUserRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+  string username = 3;
+  string password = 4;
+  string email = 5;
+  string phone = 6;
+  string nickname = 7;
+  string avatar = 8;
+  int32 status = 9;
+}
+
+// Update user status request
+message UpdateUserStatusRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+  int32 status = 3;
+}
+
+// Assign roles request
+message AssignRolesRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+  repeated string roleIds = 3;
+}
+
+// Delete user request
+message DeleteUserRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+}
+
+// RPC operation result
+message OperationResult {
+  bool success = 1;
+  string message = 2;
+}
+
+// ==================== Auth Extension Messages ====================
+
+// Refresh token RPC request
+message RefreshTokenRpcRequest {
+  string refreshToken = 1;
+}
+
+// Logout RPC request
+message LogoutRpcRequest {
+  string accessToken = 1;
+  string refreshToken = 2;
+}
+
+// Change password RPC request
+message ChangePasswordRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+  string oldPassword = 3;
+  string newPassword = 4;
+}
+
+// ==================== Role Messages ====================
+
+// Role information response
+message RoleRpcResponse {
+  int64 id = 1;
+  string code = 2;
+  string name = 3;
+  string description = 4;
+  int32 status = 5;
+  repeated string permissions = 6;
+}
+
+// Get all roles request
+message GetAllRolesRequest {
+  string tenantId = 1;
+}
+
+// Get role by code request
+message GetRoleByCodeRequest {
+  string code = 1;
+  string tenantId = 2;
+}
+
+// Get role by ID request
+message GetRoleByIdRequest {
+  string roleId = 1;
+}
+
+// Create role request
+message CreateRoleRpcRequest {
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  string tenantId = 4;
+}
+
+// Update role request
+message UpdateRoleRpcRequest {
+  string roleId = 1;
+  string name = 2;
+  string description = 3;
+}
+
+// Delete role request
+message DeleteRoleRpcRequest {
+  string roleId = 1;
+}
+
+// Assign permissions to role request
+message AssignPermissionsRpcRequest {
+  string roleId = 1;
+  string tenantId = 2;
+  repeated string permissionIds = 3;
+}
+
+// Roles list response
+message RoleListResponse {
+  repeated RoleRpcResponse roles = 1;
+}
+
+// ==================== Permission Messages ====================
+
+// Permission information response
+message PermissionRpcResponse {
+  int64 id = 1;
+  string code = 2;
+  string name = 3;
+  string resource = 4;
+  string action = 5;
+  string description = 6;
+}
+
+// Get all permissions request
+message GetAllPermissionsRequest {
+  string tenantId = 1;
+}
+
+// Get permission by ID request
+message GetPermissionByIdRequest {
+  string permissionId = 1;
+}
+
+// Create permission request
+message CreatePermissionRpcRequest {
+  string code = 1;
+  string name = 2;
+  string resource = 3;
+  string action = 4;
+  string description = 5;
+  string tenantId = 6;
+}
+
+// Delete permission request
+message DeletePermissionRpcRequest {
+  string permissionId = 1;
+}
+
+// Permissions list response
+message PermissionListResponse {
+  repeated PermissionRpcResponse permissions = 1;
+}
+
 // ==================== Services ====================
 
 // Authentication RPC Service (Protobuf IDL mode)
 service AuthRpcServiceProtobuf {
-  // Register user
   rpc register(RegisterRpcRequest) returns (RegisterRpcResult);
-
-  // Authenticate user credentials (login through HTTP, not recommended for RPC)
   rpc authenticate(LoginRpcRequest) returns (AuthResult);
-
-  // Get user by ID
   rpc getUserById(UserByIdRequest) returns (UserRpcResponse);
-
-  // Get user by username
   rpc getUserByUsername(UserByUsernameRequest) returns (UserRpcResponse);
-
-  // Check if user has permission
   rpc hasPermission(PermissionCheckRequest) returns (BoolValue);
-
-  // Check if user has role
   rpc hasRole(RoleCheckRequest) returns (BoolValue);
-
-  // Get user permissions
   rpc getUserPermissions(UserPermissionsRequest) returns (StringListResponse);
-
-  // Get user roles
   rpc getUserRoles(UserRolesRequest) returns (StringListResponse);
-
-  // Search users with pagination
   rpc searchUsers(SearchUsersRequest) returns (UserPageResponse);
+  rpc refreshToken(RefreshTokenRpcRequest) returns (TokenRpcResponse);
+  rpc logout(LogoutRpcRequest) returns (OperationResult);
+  rpc changePassword(ChangePasswordRpcRequest) returns (OperationResult);
 }
 
 // Token RPC Service (Protobuf IDL mode)
 service TokenRpcServiceProtobuf {
-  // Generate token for user
   rpc generateToken(TokenGenerationRequest) returns (TokenRpcResponse);
+  rpc parseToken(ParseTokenRpcRequest) returns (TokenValidationResult);
+  rpc revokeAllTokens(RevokeAllTokensRpcRequest) returns (Empty);
+}
 
-  // Parse token to get complete user information
-  rpc parseToken(StringValue) returns (TokenValidationResult);
+// User Management RPC Service (Protobuf IDL mode)
+service UserRpcServiceProtobuf {
+  rpc updateUser(UpdateUserRpcRequest) returns (OperationResult);
+  rpc updateUserStatus(UpdateUserStatusRpcRequest) returns (OperationResult);
+  rpc assignRoles(AssignRolesRpcRequest) returns (OperationResult);
+  rpc deleteUser(DeleteUserRpcRequest) returns (OperationResult);
+}
 
-  // Revoke all tokens for user
-  rpc revokeAllTokens(Int64Value) returns (Empty);
+// Role RPC Service (Protobuf IDL mode)
+service RoleRpcServiceProtobuf {
+  rpc getAllRoles(GetAllRolesRequest) returns (RoleListResponse);
+  rpc getRoleByCode(GetRoleByCodeRequest) returns (RoleRpcResponse);
+  rpc getRoleById(GetRoleByIdRequest) returns (RoleRpcResponse);
+  rpc createRole(CreateRoleRpcRequest) returns (RoleRpcResponse);
+  rpc updateRole(UpdateRoleRpcRequest) returns (OperationResult);
+  rpc deleteRole(DeleteRoleRpcRequest) returns (OperationResult);
+  rpc assignPermissions(AssignPermissionsRpcRequest) returns (OperationResult);
+}
+
+// Permission RPC Service (Protobuf IDL mode)
+service PermissionRpcServiceProtobuf {
+  rpc getAllPermissions(GetAllPermissionsRequest) returns (PermissionListResponse);
+  rpc getPermissionById(GetPermissionByIdRequest) returns (PermissionRpcResponse);
+  rpc createPermission(CreatePermissionRpcRequest) returns (PermissionRpcResponse);
+  rpc deletePermission(DeletePermissionRpcRequest) returns (OperationResult);
+}
+
+// ==================== Token Service Messages ====================
+
+// Parse token RPC request
+message ParseTokenRpcRequest {
+  string accessToken = 1;
+}
+
+// Revoke all tokens RPC request
+message RevokeAllTokensRpcRequest {
+  string userId = 1;
 }
 
 // ==================== Wrapper Types ====================
-
-// String wrapper
-message StringValue {
-  string value = 1;
-}
-
-// Int64 wrapper
-message Int64Value {
-  int64 value = 1;
-}
 
 // Bool wrapper
 message BoolValue {

@@ -76,6 +76,12 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public RoleResponse createRole(String code, String name, String description) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
+        return createRole(code, name, description, tenantId);
+    }
+
+    @Override
+    @Transactional
+    public RoleResponse createRole(String code, String name, String description, Long tenantId) {
         log.info("Creating new role: {} in tenant: {}", code, tenantId);
 
         // Check if role code already exists

@@ -49,6 +49,11 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     public PermissionResponse createPermission(String code, String name, String resource, String action, String description) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
+        return createPermission(code, name, resource, action, description, tenantId);
+    }
+
+    @Override
+    public PermissionResponse createPermission(String code, String name, String resource, String action, String description, Long tenantId) {
         log.info("Creating new permission: {} in tenant: {}", code, tenantId);
 
         // Check if permission code already exists

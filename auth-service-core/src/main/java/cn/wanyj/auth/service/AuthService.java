@@ -49,4 +49,10 @@ public interface AuthService {
      * 修改密码
      */
     void changePassword(Long userId, ChangePasswordRequest request);
+
+    /**
+     * Change password with explicit tenantId (for RPC context)
+     * 修改密码（带显式租户ID，用于RPC上下文）
+     */
+    void changePassword(Long userId, Long tenantId, ChangePasswordRequest request);
 }

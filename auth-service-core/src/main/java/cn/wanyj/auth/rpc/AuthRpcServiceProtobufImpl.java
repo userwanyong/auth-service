@@ -1,6 +1,7 @@
 package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
+import cn.wanyj.auth.dto.request.ChangePasswordRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
 import cn.wanyj.auth.dto.request.RegisterRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
@@ -17,6 +18,7 @@ import org.apache.dubbo.config.annotation.DubboService;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -48,7 +50,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 RegisterRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
-                    .tenantId(request.getTenantId())
+                    .tenantId(Long.parseLong(request.getTenantId()))
                     .email(emptyToNull(request.getEmail()))
                     .phone(emptyToNull(request.getPhone()))
                     .nickname(emptyToNull(request.getNickname()))
@@ -88,7 +90,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 LoginRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
-                    .tenantId(request.getTenantId())
+                    .tenantId(Long.parseLong(request.getTenantId()))
                     .build()
             );
 
@@ -117,20 +119,23 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     public UserRpcResponse getUserById(UserByIdRequest request) {
         log.info("RPC getUserById: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Load user with roles and permissions using provided tenantId
             cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                request.getUserId(),
-                request.getTenantId()
+                userId,
+                tenantId
             );
 
             if (user == null || user.getStatus() == 0) {
-                log.warn("User not found or disabled: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                log.warn("User not found or disabled: userId={}, tenantId={}", userId, tenantId);
                 return UserRpcResponse.getDefaultInstance();
             }
 
             // Verify user belongs to the specified tenant
-            if (!user.getTenantId().equals(request.getTenantId())) {
-                log.warn("User {} does not belong to tenant {}", request.getUserId(), request.getTenantId());
+            if (!user.getTenantId().equals(tenantId)) {
+                log.warn("User {} does not belong to tenant {}", userId, tenantId);
                 return UserRpcResponse.getDefaultInstance();
             }
 
@@ -147,15 +152,17 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         log.info("RPC getUserByUsername: username={}, tenantId={}",
             request.getUsername(), request.getTenantId());
         try {
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Load user with roles and permissions using username and tenantId
             cn.wanyj.auth.entity.User user = userMapper.findByUsernameWithRolesAndPermissions(
                 request.getUsername(),
-                request.getTenantId()
+                tenantId
             );
 
             if (user == null || user.getStatus() == 0) {
                 log.warn("User not found or disabled: username={}, tenantId={}",
-                    request.getUsername(), request.getTenantId());
+                    request.getUsername(), tenantId);
                 return UserRpcResponse.getDefaultInstance();
             }
 
@@ -172,10 +179,13 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         log.info("RPC hasPermission: userId={}, permission={}, tenantId={}",
             request.getUserId(), request.getPermission(), request.getTenantId());
         try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Use tenantId from request
             cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                request.getUserId(),
-                request.getTenantId()
+                userId,
+                tenantId
             );
 
             if (user == null || user.getStatus() == 0) {
@@ -198,10 +208,13 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         log.info("RPC hasRole: userId={}, role={}, tenantId={}",
             request.getUserId(), request.getRole(), request.getTenantId());
         try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Use tenantId from request
             cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                request.getUserId(),
-                request.getTenantId()
+                userId,
+                tenantId
             );
 
             if (user == null || user.getStatus() == 0) {
@@ -222,14 +235,17 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     public StringListResponse getUserPermissions(UserPermissionsRequest request) {
         log.info("RPC getUserPermissions: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Use tenantId from request
             cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                request.getUserId(),
-                request.getTenantId()
+                userId,
+                tenantId
             );
 
             if (user == null) {
-                log.warn("User not found: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                log.warn("User not found: userId={}, tenantId={}", userId, tenantId);
                 return StringListResponse.getDefaultInstance();
             }
 
@@ -250,14 +266,17 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     public StringListResponse getUserRoles(UserRolesRequest request) {
         log.info("RPC getUserRoles: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
         try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
             // Use tenantId from request
             cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                request.getUserId(),
-                request.getTenantId()
+                userId,
+                tenantId
             );
 
             if (user == null) {
-                log.warn("User not found: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+                log.warn("User not found: userId={}, tenantId={}", userId, tenantId);
                 return StringListResponse.getDefaultInstance();
             }
 
@@ -281,7 +300,9 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         log.info("RPC searchUsers: tenantId={}, page={}, size={}, keyword={}",
             request.getTenantId(), page, size, keyword);
         try {
-            PageResponse<UserResponse> pageResponse = searchUsersByTenant(keyword, request.getTenantId(), page, size);
+            Long tenantId = Long.parseLong(request.getTenantId());
+
+            PageResponse<UserResponse> pageResponse = searchUsersByTenant(keyword, tenantId, page, size);
 
             UserPageResponse.Builder builder = UserPageResponse.newBuilder()
                 .setTotal(pageResponse.getTotal() != null ? pageResponse.getTotal() : 0L)
@@ -304,15 +325,92 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         }
     }
 
+    @Override
+    public TokenRpcResponse refreshToken(RefreshTokenRpcRequest request) {
+        log.info("RPC refreshToken");
+        try {
+            TokenResponse tokenResponse = authService.refreshToken(request.getRefreshToken());
+
+            return TokenRpcResponse.newBuilder()
+                .setAccessToken(tokenResponse.getAccessToken())
+                .setRefreshToken(tokenResponse.getRefreshToken())
+                .setExpiresIn(tokenResponse.getExpiresIn())
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Refresh token failed: {}", e.getMessage());
+            return TokenRpcResponse.getDefaultInstance();
+        } catch (Exception e) {
+            log.error("Refresh token error", e);
+            return TokenRpcResponse.getDefaultInstance();
+        }
+    }
+
+    @Override
+    public OperationResult logout(LogoutRpcRequest request) {
+        log.info("RPC logout");
+        try {
+            authService.logout(request.getAccessToken(), request.getRefreshToken());
+            return OperationResult.newBuilder()
+                .setSuccess(true)
+                .setMessage("登出成功")
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Logout failed: {}", e.getMessage());
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage(e.getMessage())
+                .build();
+        } catch (Exception e) {
+            log.error("Logout error", e);
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage("登出失败")
+                .build();
+        }
+    }
+
+    @Override
+    public OperationResult changePassword(ChangePasswordRpcRequest request) {
+        log.info("RPC changePassword: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        try {
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
+            ChangePasswordRequest changePasswordRequest = ChangePasswordRequest.builder()
+                .oldPassword(request.getOldPassword())
+                .newPassword(request.getNewPassword())
+                .build();
+
+            authService.changePassword(userId, tenantId, changePasswordRequest);
+
+            return OperationResult.newBuilder()
+                .setSuccess(true)
+                .setMessage("密码修改成功")
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Change password failed: {}", e.getMessage());
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage(e.getMessage())
+                .build();
+        } catch (Exception e) {
+            log.error("Change password error", e);
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage("密码修改失败")
+                .build();
+        }
+    }
+
     private PageResponse<UserResponse> searchUsersByTenant(String keyword, Long tenantId, int page, int size) {
         List<cn.wanyj.auth.entity.User> users;
         long total;
 
         if (keyword != null && !keyword.isBlank()) {
-            users = userMapper.findByKeyword(keyword, tenantId);
+            users = userMapper.findByKeywordWithRolesAndPermissions(keyword, tenantId);
             total = userMapper.countByKeyword(keyword, tenantId);
         } else {
-            users = userMapper.findAllByTenantIdWithRoles(tenantId);
+            users = userMapper.findAllByTenantIdWithRolesAndPermissions(tenantId);
             total = userMapper.countAllByTenantId(tenantId);
         }
 
@@ -387,6 +485,16 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     }
 
     private UserResponse convertToSimpleUserResponse(cn.wanyj.auth.entity.User user) {
+        Set<String> permissions = Collections.emptySet();
+        if (user.getRoles() != null) {
+            permissions = user.getRoles().stream()
+                .flatMap(r -> r.getPermissions() != null
+                    ? r.getPermissions().stream()
+                    : java.util.stream.Stream.empty())
+                .map(p -> p.getCode())
+                .collect(Collectors.toSet());
+        }
+
         return UserResponse.builder()
             .id(user.getId())
             .tenantId(user.getTenantId())
@@ -402,7 +510,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
             .roles(user.getRoles() != null
                 ? user.getRoles().stream().map(r -> r.getCode()).collect(Collectors.toSet())
                 : Collections.emptySet())
-            .permissions(Collections.emptySet())
+            .permissions(permissions)
             .build();
     }
 

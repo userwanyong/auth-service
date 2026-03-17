@@ -341,6 +341,12 @@ public class AuthServiceImpl implements AuthService {
     public void changePassword(Long userId, ChangePasswordRequest request) {
         // Get tenant ID from JWT token
         Long tenantId = SecurityUtils.getCurrentTenantId();
+        changePassword(userId, tenantId, request);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Long userId, Long tenantId, ChangePasswordRequest request) {
         log.info("Changing password for user: {} in tenant: {}", userId, tenantId);
 
         User user = userMapper.findById(userId);
@@ -349,7 +355,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Verify user belongs to current tenant
-        if (!user.getTenantId().equals(tenantId)) {
+        if (tenantId != null && !user.getTenantId().equals(tenantId)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 

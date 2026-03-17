@@ -36,6 +36,12 @@ public interface RoleService {
     RoleResponse createRole(String code, String name, String description);
 
     /**
+     * Create new role with explicit tenantId (for RPC context)
+     * 创建新角色（带显式租户ID，用于RPC上下文）
+     */
+    RoleResponse createRole(String code, String name, String description, Long tenantId);
+
+    /**
      * Update role
      * 更新角色
      */

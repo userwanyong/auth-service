@@ -37,21 +37,24 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
         log.info("RPC generate token: userId={}, expiration={}, tenantId={}",
             request.getUserId(), request.getExpiration(), request.getTenantId());
         try {
-            User user = userMapper.findByIdWithRoles(request.getUserId());
+            Long userId = Long.parseLong(request.getUserId());
+            Long tenantId = Long.parseLong(request.getTenantId());
+
+            User user = userMapper.findByIdWithRoles(userId);
             if (user == null) {
-                log.error("User not found: {}", request.getUserId());
+                log.error("User not found: {}", userId);
                 return TokenRpcResponse.getDefaultInstance();
             }
 
             if (user.getStatus() == 0) {
-                log.error("User is disabled: {}", request.getUserId());
+                log.error("User is disabled: {}", userId);
                 return TokenRpcResponse.getDefaultInstance();
             }
 
             // If tenantId is provided in request, verify it matches user's tenant
-            if (request.getTenantId() > 0 && !user.getTenantId().equals(request.getTenantId())) {
+            if (tenantId > 0 && !user.getTenantId().equals(tenantId)) {
                 log.error("Tenant mismatch: user belongs to tenant {}, but request specified {}",
-                    user.getTenantId(), request.getTenantId());
+                    user.getTenantId(), tenantId);
                 return TokenRpcResponse.getDefaultInstance();
             }
 
@@ -69,18 +72,18 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
                 .setExpiresIn(expiresIn)
                 .build();
         } catch (Exception e) {
-            log.error("Failed to generate token for userId: {}", request.getUserId(), e);
+            log.error("Failed to generate token", e);
             return TokenRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
-    public TokenValidationResult parseToken(StringValue token) {
+    public TokenValidationResult parseToken(ParseTokenRpcRequest request) {
         log.info("RPC parseToken");
         try {
-            String tokenValue = token.getValue();
+            String accessToken = request.getAccessToken();
 
-            if (!jwtTokenProvider.validateAccessToken(tokenValue)) {
+            if (!jwtTokenProvider.validateAccessToken(accessToken)) {
                 log.warn("Token is invalid");
                 return TokenValidationResult.newBuilder()
                     .setValid(false)
@@ -88,18 +91,18 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
             }
 
             // Extract tenant_id from JWT token
-            Claims claims = jwtTokenProvider.getClaimsFromToken(tokenValue);
+            Claims claims = jwtTokenProvider.getClaimsFromToken(accessToken);
             Long tenantId = claims.get("tenant_id", Long.class);
 
             // Check blacklist
-            if (tokenService.isBlacklisted(tenantId, tokenValue)) {
+            if (tokenService.isBlacklisted(tenantId, accessToken)) {
                 log.warn("Token is blacklisted: tenant={}", tenantId);
                 return TokenValidationResult.newBuilder()
                     .setValid(false)
                     .build();
             }
 
-            Long userId = jwtTokenProvider.getUserIdFromToken(tokenValue);
+            Long userId = jwtTokenProvider.getUserIdFromToken(accessToken);
 
             // Load user with roles and permissions
             User user = userMapper.findByIdWithRolesAndPermissions(userId, tenantId);
@@ -136,20 +139,19 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
     }
 
     @Override
-    public Empty revokeAllTokens(Int64Value userId) {
-        log.info("RPC revoke all tokens: userId={}", userId.getValue());
+    public Empty revokeAllTokens(RevokeAllTokensRpcRequest request) {
+        Long userId = Long.parseLong(request.getUserId());
+        log.info("RPC revoke all tokens: userId={}", userId);
         try {
-            // Get user to find tenantId
-            User user = userMapper.findById(userId.getValue());
+            User user = userMapper.findById(userId);
             if (user == null) {
-                log.error("User not found: {}", userId.getValue());
+                log.error("User not found: {}", userId);
                 return Empty.getDefaultInstance();
             }
-
-            tokenService.revokeAllTokens(user.getTenantId(), userId.getValue());
-            log.info("All tokens revoked for tenant={}, user={}", user.getTenantId(), userId.getValue());
+            tokenService.revokeAllTokens(user.getTenantId(), userId);
+            log.info("All tokens revoked for tenant={}, user={}", user.getTenantId(), userId);
         } catch (Exception e) {
-            log.error("Failed to revoke tokens for userId: {}", userId.getValue(), e);
+            log.error("Failed to revoke tokens for userId: {}", userId, e);
         }
         return Empty.getDefaultInstance();
     }
