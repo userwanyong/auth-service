@@ -68,10 +68,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtTokenProvider.getClaimsFromToken(token);
                 Long tenantId = claims.get("tenant_id", Long.class);
                 Long userId = Long.parseLong(claims.getSubject());
+                String jti = claims.getId();
 
-                // Check if token is blacklisted
-                if (tokenService.isBlacklisted(tenantId, token)) {
-                    log.warn("Token is blacklisted: tenant={}, token:{}...", tenantId, token.substring(0, Math.min(20, token.length())));
+                // Check if token is blacklisted by jti
+                if (jti != null && tokenService.isBlacklisted(tenantId, jti)) {
+                    log.warn("Token is blacklisted: tenant={}, jti:{}", tenantId, jti);
                     request.setAttribute(TOKEN_ERROR_ATTRIBUTE, ErrorCode.TOKEN_BLACKLISTED);
                 } else {
                     // Extract roles and permissions from JWT claims
@@ -88,11 +89,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         permissions.forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
                     }
 
-                    // Create authentication object with user ID, tenant ID and authorities
-                    // Store both userId and tenantId in the principal using an array
+                    // Create authentication object with type-safe AuthPrincipal
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    new Object[]{userId, tenantId}, // principal: [userId, tenantId]
+                                    new AuthPrincipal(userId, tenantId),
                                     null,
                                     authorities
                             );

@@ -17,6 +17,12 @@ public class SecurityUtils {
     public static Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
+        // Prefer AuthPrincipal
+        if (authentication != null && authentication.getPrincipal() instanceof AuthPrincipal) {
+            return ((AuthPrincipal) authentication.getPrincipal()).getUserId();
+        }
+
+        // Fallback for Object[] format
         if (authentication != null && authentication.getPrincipal() instanceof Object[]) {
             Object[] principal = (Object[]) authentication.getPrincipal();
             if (principal.length >= 1 && principal[0] instanceof Long) {
@@ -39,6 +45,12 @@ public class SecurityUtils {
     public static Long getCurrentTenantId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
+        // Prefer AuthPrincipal
+        if (authentication != null && authentication.getPrincipal() instanceof AuthPrincipal) {
+            return ((AuthPrincipal) authentication.getPrincipal()).getTenantId();
+        }
+
+        // Fallback for Object[] format
         if (authentication != null && authentication.getPrincipal() instanceof Object[]) {
             Object[] principal = (Object[]) authentication.getPrincipal();
             if (principal.length >= 2 && principal[1] instanceof Long) {

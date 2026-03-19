@@ -14,6 +14,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -25,10 +26,10 @@ import java.util.stream.Collectors;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:Yo3bOIzQhkFc+lRvAEj90Hvx89IzgEC5FduXDPCTiB0=}")
+    @Value("${jwt.secret:}")
     private String secret;
 
-    @Value("${jwt.access-token-expiration:3600000}") // 1 hour in milliseconds
+    @Value("${jwt.access-token-expiration:900000}") // 15 minutes in milliseconds
     private Long accessTokenExpiration;
 
     @Value("${jwt.refresh-token-expiration:604800000}") // 7 days in milliseconds
@@ -38,10 +39,12 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("JWT secret is not configured. Please set JWT_SECRET in .env file or environment variable.");
+        }
         // Ensure the secret key is at least 256 bits (32 bytes) for HS256
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
-            // If key is too short, pad it or generate a warning
             log.warn("JWT secret key is less than 256 bits. Consider using a longer secret key.");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
@@ -66,6 +69,7 @@ public class JwtTokenProvider {
                 .collect(Collectors.toSet());
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
                 .claim("email", user.getEmail())
@@ -200,5 +204,18 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.get("tenant_id", Long.class);
+    }
+
+    /**
+     * Get JTI (JWT ID) from token
+     * 从令牌中获取JTI
+     */
+    public String getJtiFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return claims.getId();
     }
 }

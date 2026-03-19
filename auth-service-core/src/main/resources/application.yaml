@@ -9,8 +9,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 12123
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -23,7 +23,7 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password: wanyj
+      password: ${REDIS_PASSWORD:}
       database: 0
       lettuce:
         pool:
@@ -43,10 +43,16 @@ mybatis:
 # JWT Configuration
 jwt:
   # Secret key for JWT signing (256-bit Base64 encoded)
-  # IMPORTANT: Keep this secret and don't commit to public repositories!
-  secret: Yo3bOIzQhkFc+lRvAEj90Hvx89IzgEC5FduXDPCTiB0=
-  access-token-expiration: 3600000    # 1 hour (milliseconds)
+  # Set via JWT_SECRET in .env file or environment variable
+  secret: ${JWT_SECRET:}
+  access-token-expiration: 900000    # 15 minutes (milliseconds)
   refresh-token-expiration: 604800000 # 7 days (milliseconds)
+
+# Login Rate Limiting
+auth:
+  rate-limit:
+    max-attempts: 5
+    window-seconds: 900  # 15 minutes
 
 # Logging Configuration
 logging:
@@ -87,6 +93,10 @@ dubbo:
     password: nacos
     parameters:
       namespace:
+
+  # RPC Service Token for inter-service authentication
+  rpc:
+    service-token: ${RPC_SERVICE_TOKEN:}
 
   # Service provider configuration
   provider:

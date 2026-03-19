@@ -48,24 +48,24 @@ public interface TokenService {
     boolean verifyRefreshToken(Long tenantId, Long userId, String refreshToken);
 
     /**
-     * Add access token to blacklist (with tenant isolation)
-     * 将 accessToken 加入黑名单（带租户隔离）
+     * Add access token to blacklist using jti (with tenant isolation)
+     * 将 accessToken 的 jti 加入黑名单（带租户隔离）
      *
      * @param tenantId 租户ID
-     * @param token JWT token
+     * @param jti JWT ID
      * @param ttl   TTL in seconds
      */
-    void addToBlacklist(Long tenantId, String token, long ttl);
+    void addToBlacklist(Long tenantId, String jti, long ttl);
 
     /**
-     * Check if token is blacklisted
-     * 检查 token 是否在黑名单中
+     * Check if token is blacklisted by jti
+     * 通过 jti 检查 token 是否在黑名单中
      *
      * @param tenantId 租户ID
-     * @param token JWT token
+     * @param jti JWT ID
      * @return true if blacklisted, false otherwise
      */
-    boolean isBlacklisted(Long tenantId, String token);
+    boolean isBlacklisted(Long tenantId, String jti);
 
     /**
      * Delete all tokens for a user (refresh token and access tokens in blacklist)

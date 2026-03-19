@@ -43,3 +43,5 @@ build/
 /docs/mvp-design.md
 /docs/microservice-rpc-design.md
 /docs/multi-tenant-design.md
+/.env
+/docs/test-verification-guide.md

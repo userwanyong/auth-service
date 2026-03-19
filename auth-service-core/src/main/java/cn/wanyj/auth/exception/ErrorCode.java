@@ -38,6 +38,7 @@ public enum ErrorCode {
     TENANT_USER_LIMIT_REACHED(1016, "租户用户数量已达上限"),
     TENANT_CODE_EXISTS(1017, "租户编码已存在"),
     TENANT_NOT_FOUND(1018, "租户不存在"),
+    LOGIN_RATE_LIMITED(1019, "登录尝试过于频繁，请稍后再试"),
 
     // Authorization errors - 授权错误
     ACCESS_DENIED(2001, "无权限访问"),

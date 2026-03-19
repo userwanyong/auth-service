@@ -137,6 +137,25 @@ CREATE TABLE IF NOT EXISTS `uid_generator_worker_id` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='uid-generator worker id分配表';
 
 -- ============================================
+-- Table: audit_log (审计日志表)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `audit_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `tenant_id` BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
+  `user_id` BIGINT NULL COMMENT '操作用户ID',
+  `username` VARCHAR(100) NULL COMMENT '操作用户名',
+  `action` VARCHAR(50) NOT NULL COMMENT '操作动作（LOGIN/REGISTER/LOGOUT/CHANGE_PASSWORD）',
+  `resource` VARCHAR(100) NULL COMMENT '资源类型（User/Token）',
+  `detail` VARCHAR(500) NULL COMMENT '操作详情',
+  `ip_address` VARCHAR(45) NULL COMMENT '客户端IP',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  INDEX `idx_tenant_action` (`tenant_id`, `action`),
+  INDEX `idx_user_id` (`user_id`),
+  INDEX `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审计日志表';
+
+-- ============================================
 -- Initial Data (初始数据)
 -- ============================================
 -- 注意：如需重新初始化，请先手动清空相关表数据

@@ -17,7 +17,11 @@
 - **RBAC 权限模型**：用户-角色-权限三层模型，支持完整的 CRUD 权限
 - **多租户支持**：基于 tenant_id 的数据隔离，创建租户自动初始化管理员
 - **平台级权限**：租户管理与平台管理员角色
-- **令牌黑名单**：支持主动注销与令牌撤销
+- **令牌黑名单**：基于 jti 的令牌撤销机制
+- **登录限流**：基于 Redis 滑动窗口的登录频率限制
+- **审计日志**：异步记录用户操作（登录/注册/登出/修改密码）
+- **RPC 服务鉴权**：Dubbo Filter 校验服务间调用令牌
+- **敏感配置外部化**：JWT 密钥、数据库/Redis 密码均通过环境变量注入
 - **Redis 缓存**：令牌存储与会话管理
 - **Protobuf 序列化**：高性能 RPC 通信
 - **统一响应格式**：标准化的 API 响应
@@ -79,7 +83,7 @@
 
 ## 部署方式
 
-前置准备：mysql、redis、nacos、并确保已执行数据库初始化脚本
+前置准备：mysql、redis、nacos、并确保已执行数据库初始化脚本（`docs/init-schema.sql`）
 
 ### 方式一：Docker Compose 部署脚本（推荐）
 
@@ -90,7 +94,7 @@ version: '3.8'
 
 services:
   auth-service:
-    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:3.1
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:4.0
     container_name: auth-service-app
     restart: unless-stopped
     environment:
@@ -98,11 +102,15 @@ services:
       # Database Configuration
       SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: 12123
+      SPRING_DATASOURCE_PASSWORD: your_db_password
       # Redis Configuration
       SPRING_DATA_REDIS_HOST: 127.0.0.1
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: 12123
+      SPRING_DATA_REDIS_PASSWORD: your_redis_password
+      # JWT Secret (generate with: openssl rand -base64 32)
+      JWT_SECRET: your_jwt_secret
+      # RPC Service Token (for inter-service authentication)
+      RPC_SERVICE_TOKEN: your_rpc_service_token
       # Nacos Configuration
       dubbo.registry.address: nacos://127.0.0.1:8848
       dubbo.registry.username: nacos
@@ -153,8 +161,9 @@ networks:
 **IDE 配置（IDEA / Eclipse）：**
 
 1. 导入项目为 Maven 项目
-2. 等待依赖下载完成
-3. 运行 `AuthServiceApplication` 主类
+2. 复制 `.env.example` 为 `.env` 并填写实际配置值
+3. 等待依赖下载完成
+4. 运行 `AuthServiceApplication` 主类
 
 **或使用 Maven 命令：**
 ```bash
@@ -254,7 +263,7 @@ mvn spring-boot:run -pl auth-service-core
 <dependency>
     <groupId>cn.wanyj.auth</groupId>
     <artifactId>auth-service-api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0</version>
 </dependency>
 ```
 
@@ -353,11 +362,14 @@ auth-service/
 ├── auth-service-core/             # 核心服务实现模块
 │   └── src/main/
 │       ├── java/cn/wanyj/auth/
+│       │   ├── annotation/        # 自定义注解（@Auditable 等）
+│       │   ├── aspect/            # AOP 切面（审计日志）
 │       │   ├── config/            # 配置类
 │       │   ├── controller/        # REST API 控制器
 │       │   ├── dto/               # REST DTO
 │       │   ├── entity/            # 实体类
 │       │   ├── exception/         # 异常处理
+│       │   ├── filter/            # Dubbo RPC 过滤器（鉴权）
 │       │   ├── mapper/            # MyBatis Mapper
 │       │   ├── rpc/               # Dubbo RPC 实现
 │       │   ├── security/          # 安全模块
@@ -467,6 +479,20 @@ auth-service/
 
 唯一约束：(role_id, permission_id, tenant_id)
 
+#### audit_log (审计日志表)
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| id | BIGINT | 主键ID |
+| tenant_id | BIGINT | 租户ID |
+| user_id | BIGINT | 操作用户ID |
+| username | VARCHAR(100) | 操作用户名 |
+| action | VARCHAR(50) | 操作动作（LOGIN/REGISTER/LOGOUT/CHANGE_PASSWORD） |
+| resource | VARCHAR(100) | 资源类型（User/Token） |
+| detail | VARCHAR(500) | 操作详情 |
+| ip_address | VARCHAR(45) | 客户端IP |
+| created_at | DATETIME | 创建时间 |
+
 ### 默认数据
 
 | 类型 | 编码 | 名称 | 说明 |
@@ -521,7 +547,8 @@ auth-service/
 **Redis Key 模式（多租户隔离）：**
 ```
 refresh_token:{tenant_id}:{user_id}
-blacklist:{tenant_id}:{token}
+blacklist:{tenant_id}:{jti}
+rate-limit:login:{tenant_id}:{username}
 ```
 
 ### 平台级权限系统
@@ -550,13 +577,14 @@ public ResponseEntity<ApiResponse<TenantResponse>> createTenant(
 
 | 令牌类型 | 有效期 | 用途 |
 |----------|--------|------|
-| Access Token | 1小时 | API认证 |
+| Access Token | 15分钟 | API认证 |
 | Refresh Token | 7天 | 令牌续期 |
 
 **JWT Claims**：
 ```json
 {
   "sub": "用户ID",
+  "jti": "令牌唯一标识（用于黑名单）",
   "username": "用户名",
   "tenant_id": "租户ID",
   "roles": ["角色列表"],
@@ -583,9 +611,29 @@ public ResponseEntity<ApiResponse<TenantResponse>> createTenant(
 ### 令牌黑名单
 
 - 存储位置：Redis
-- Key格式：`blacklist:{tenant_id}:{token}`
+- Key格式：`blacklist:{tenant_id}:{jti}`
 - TTL：匹配令牌剩余有效期
 - 检查位置：`JwtAuthenticationFilter` 每次请求时验证
+
+### 登录限流
+
+- 策略：Redis ZSET 滑动窗口
+- 规则：15分钟内最多 5 次失败尝试
+- Key格式：`rate-limit:login:{tenantId}:{username}`
+- 登录成功后自动重置计数
+
+### 审计日志
+
+- 存储位置：MySQL `audit_log` 表
+- 记录时机：异步写入（`@Async`），不影响主流程
+- 记录动作：`REGISTER`、`LOGIN`、`LOGOUT`、`CHANGE_PASSWORD`
+- 身份提取：优先从 SecurityContext 获取，支持 RPC 场景通过参数名匹配和 JWT 解析
+
+### RPC 服务鉴权
+
+- 机制：Dubbo SPI Filter（`RpcAuthFilter`）
+- 校验方式：调用方在 attachment 中携带 `rpc-service-token`
+- 配置：通过 `RPC_SERVICE_TOKEN` 环境变量设置，未配置时跳过鉴权
 
 ## 配置说明
 
@@ -616,10 +664,10 @@ spring:
 
 ```yaml
 jwt:
-  # 密钥（Base64编码，256位），生产环境请务必修改
-  secret: Yo3bOIzQhkFc+lRvAEj90Hvx89IzgEC5FduXDPCTiB0=
-  # 访问令牌有效期（毫秒）：1小时
-  access-token-expiration: 3600000
+  # 密钥通过环境变量 JWT_SECRET 注入，未设置时服务启动失败
+  secret: ${JWT_SECRET:}
+  # 访问令牌有效期（毫秒）：15分钟
+  access-token-expiration: 900000
   # 刷新令牌有效期（毫秒）：7天
   refresh-token-expiration: 604800000
 ```
@@ -639,6 +687,8 @@ dubbo:
     address: nacos://localhost:8848
     username: nacos
     password: nacos
+  rpc:
+    service-token: ${RPC_SERVICE_TOKEN:}  # RPC 服务间鉴权令牌
   scan:
     base-packages: cn.wanyj.auth.rpc
 ```
@@ -668,6 +718,10 @@ mybatis:
 | 1015 | 无效或不存在的租户 |
 | 1016 | 租户用户数量已达上限 |
 | 1018 | 租户不存在 |
+| 1019 | 登录尝试过于频繁，请稍后再试 |
+| 1020 | 邮箱格式无效 |
+| 1021 | 手机号格式无效 |
+| 1022 | 原密码错误 |
 
 ## 使用示例
 
@@ -716,26 +770,6 @@ curl -X POST http://localhost:8123/api/tenant \
   }'
 ```
 
-## 安全说明
-
-### 密码加密
-
-- 算法：BCrypt
-- 强度：默认 10 轮
-
-### JWT 签名
-
-- 密钥长度：256位（Base64编码）
-- 算法：HS256（HMAC-SHA256）
-
-### 安全建议
-
-1. 生产环境必须修改 JWT 密钥
-2. 使用 HTTPS 保护 API 通信
-3. 定期轮换 Redis 密码
-4. 限制数据库访问权限
-5. 启用 Nacos 认证
-
 ## 服务端口
 
 | 服务 | 端口 | 协议 |
@@ -764,65 +798,6 @@ curl -X POST http://localhost:8123/api/tenant \
 根据登录的租户不同，管理界面会显示不同的功能：
 - **平台租户**：只能看到租户管理
 - **普通租户**：可以看到用户、角色、权限管理
-
-### 3. 如何创建新租户？
-
-1. 使用平台租户账户登录
-2. 进入"租户管理"页面
-3. 点击"添加租户"
-4. 填写租户信息并保存
-
-**注意**：创建新租户时会自动：
-- 初始化 12 个 CRUD 权限（user:read/write/create/delete, role:read/write/create/delete, permission:read/write/create/delete）
-- 创建 ROLE_ADMIN 和 ROLE_USER 角色
-- 创建管理员用户（admin/123456）
-
-### 4. 权限系统是如何工作的？
-
-系统采用 RBAC（基于角色的访问控制）模型：
-
-```
-用户 ←→ 角色 ←→ 权限
-```
-
-**CRUD 权限说明**：
-- `create`: 创建资源
-- `read`: 查看资源
-- `write`: 编辑资源
-- `delete`: 删除资源
-
-**默认权限列表**：
-- 用户管理：user:read, user:create, user:write, user:delete
-- 角色管理：role:read, role:create, role:write, role:delete
-- 权限管理：permission:read, permission:create, permission:write, permission:delete
-
-### 5. 如何为业务服务集成认证？
-
-**步骤1：添加 Maven 依赖**
-
-```xml
-<dependency>
-    <groupId>cn.wanyj.auth</groupId>
-    <artifactId>auth-service-api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-</dependency>
-```
-
-**步骤2：引用 RPC 服务并调用**
-
-```java
-@DubboReference(version = "1.0.0")
-private AuthRpcServiceProtobuf authRpcService;
-
-// 解析令牌获取用户信息
-TokenValidationResult result = authRpcService.parseToken(
-    ParseTokenRpcRequest.newBuilder().setAccessToken(token).build()
-);
-```
-
-### 6. 如何切换租户？
-
-登录时在登录页面选择对应的租户即可。JWT 令牌中包含 tenant_id 信息，后续请求会自动识别租户。
 
 ## 许可证
 

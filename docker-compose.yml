@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   auth-service:
-    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:3.2
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:4.0
     container_name: auth-service-app
     restart: unless-stopped
     environment:
@@ -11,6 +11,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: 12123
+      # JWT Configuration
+      JWT_SECRET: your_jwt_secret
       # Redis Configuration
       SPRING_DATA_REDIS_HOST: 127.0.0.1
       SPRING_DATA_REDIS_PORT: 6379
@@ -22,6 +24,8 @@ services:
       dubbo.metadata-report.address: nacos://127.0.0.1:8848
       dubbo.metadata-report.username: nacos
       dubbo.metadata-report.password: nacos
+      # RPC Service Token
+      RPC_SERVICE_TOKEN: your_rpc_service_token
       # JVM Configuration
       JAVA_OPTS: >-
         -XX:+UseContainerSupport

@@ -94,9 +94,10 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
             Claims claims = jwtTokenProvider.getClaimsFromToken(accessToken);
             Long tenantId = claims.get("tenant_id", Long.class);
 
-            // Check blacklist
-            if (tokenService.isBlacklisted(tenantId, accessToken)) {
-                log.warn("Token is blacklisted: tenant={}", tenantId);
+            // Check blacklist by jti
+            String jti = claims.getId();
+            if (jti != null && tokenService.isBlacklisted(tenantId, jti)) {
+                log.warn("Token is blacklisted: tenant={}, jti={}", tenantId, jti);
                 return TokenValidationResult.newBuilder()
                     .setValid(false)
                     .build();

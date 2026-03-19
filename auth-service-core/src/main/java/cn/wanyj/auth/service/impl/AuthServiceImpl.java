@@ -1,5 +1,6 @@
 package cn.wanyj.auth.service.impl;
 
+import cn.wanyj.auth.annotation.Auditable;
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.dto.request.ChangePasswordRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
@@ -15,6 +16,7 @@ import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.security.JwtTokenProvider;
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.service.LoginRateLimiter;
 import cn.wanyj.auth.service.TokenService;
 import cn.wanyj.auth.service.TenantService;
 import io.github.xiapxx.uid.generator.api.UidGenerator;
@@ -43,10 +45,12 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenService tokenService;
     private final TenantService tenantService;
+    private final LoginRateLimiter loginRateLimiter;
     private final UidGenerator uidGenerator;
 
     @Override
     @Transactional
+    @Auditable(action = "REGISTER", resource = "User")
     public TokenResponse register(RegisterRequest request) {
         // tenantId is required, no default fallback
         Long tenantId = request.getTenantId();
@@ -158,10 +162,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Auditable(action = "LOGIN", resource = "User")
     public TokenResponse login(LoginRequest request) {
         // tenantId is required, no default fallback
         Long tenantId = request.getTenantId();
         log.info("User login attempt: {} in tenant: {}", request.getUsername(), tenantId);
+
+        // Check login rate limit
+        if (!loginRateLimiter.allowAttempt(tenantId, request.getUsername())) {
+            throw new BusinessException(ErrorCode.LOGIN_RATE_LIMITED);
+        }
 
         // Load user from database with roles and permissions
         User user = userMapper.findByUsernameOrEmailWithRolesAndPermissions(request.getUsername(), tenantId);
@@ -191,6 +201,9 @@ public class AuthServiceImpl implements AuthService {
         tokenService.saveRefreshToken(user.getTenantId(), user.getId(), refreshToken);
 
         log.info("User logged in successfully: {} in tenant: {}", user.getId(), tenantId);
+
+        // Reset rate limit after successful login
+        loginRateLimiter.resetLimit(tenantId, request.getUsername());
 
         // Build response
         Set<String> roles = user.getRoles().stream()
@@ -263,6 +276,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    @Auditable(action = "LOGOUT", resource = "Token")
     public void logout(String accessToken, String refreshToken) {
         log.info("User logout");
 
@@ -293,12 +307,15 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
 
-        // Add accessToken to blacklist with remaining TTL
+        // Add accessToken jti to blacklist with remaining TTL
         if (accessToken != null && !accessToken.isBlank()) {
             if (jwtTokenProvider.validateAccessToken(accessToken)) {
-                long remainingTTL = jwtTokenProvider.getTokenRemainingTTL(accessToken);
-                if (remainingTTL > 0) {
-                    tokenService.addToBlacklist(tenantId, accessToken, remainingTTL);
+                String jti = jwtTokenProvider.getJtiFromToken(accessToken);
+                if (jti != null) {
+                    long remainingTTL = jwtTokenProvider.getTokenRemainingTTL(accessToken);
+                    if (remainingTTL > 0) {
+                        tokenService.addToBlacklist(tenantId, jti, remainingTTL);
+                    }
                 }
             }
         }
@@ -346,6 +363,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    @Auditable(action = "CHANGE_PASSWORD", resource = "User")
     public void changePassword(Long userId, Long tenantId, ChangePasswordRequest request) {
         log.info("Changing password for user: {} in tenant: {}", userId, tenantId);
 

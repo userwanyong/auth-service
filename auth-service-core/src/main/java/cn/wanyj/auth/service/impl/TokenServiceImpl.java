@@ -54,16 +54,18 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
-    public void addToBlacklist(Long tenantId, String token, long ttl) {
-        String key = BLACKLIST_PREFIX + tenantId + ":" + token;
+    public void addToBlacklist(Long tenantId, String jti, long ttl) {
+        String key = BLACKLIST_PREFIX + tenantId + ":" + jti;
         redisTemplate.opsForValue().set(key, "1", ttl, TimeUnit.SECONDS);
-        log.info("Added token to blacklist: tenant:{}, token:{}...", tenantId, token.substring(0, Math.min(20, token.length())));
+        log.info("Added token to blacklist: tenant:{}, jti:{}", tenantId, jti);
     }
 
     @Override
-    public boolean isBlacklisted(Long tenantId, String token) {
-        // Check blacklist with tenant isolation
-        String key = BLACKLIST_PREFIX + tenantId + ":" + token;
+    public boolean isBlacklisted(Long tenantId, String jti) {
+        if (jti == null) {
+            return false;
+        }
+        String key = BLACKLIST_PREFIX + tenantId + ":" + jti;
         Boolean exists = redisTemplate.hasKey(key);
         return exists != null && exists;
     }
