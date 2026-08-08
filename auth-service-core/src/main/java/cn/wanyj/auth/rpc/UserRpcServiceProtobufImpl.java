@@ -3,9 +3,7 @@ package cn.wanyj.auth.rpc;
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
 import cn.wanyj.auth.dto.request.UpdateUserRequest;
-import cn.wanyj.auth.entity.User;
 import cn.wanyj.auth.exception.BusinessException;
-import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +13,8 @@ import java.util.stream.Collectors;
 
 /**
  * 用户管理服务 RPC 实现 - Protobuf IDL 模式
+ * <p>所有写操作复用 {@link UserService}（带显式 tenantId）；用户存在性与租户归属
+ * 由 Service 层 loadUserAndVerifyTenant 统一校验，本类不再直接访问 Mapper。</p>
  *
  * @author wanyj
  */
@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTriple.UserRpcServiceProtobufImplBase {
 
     private final UserService userService;
-    private final UserMapper userMapper;
 
     @Override
     public OperationResult updateUser(UpdateUserRpcRequest request) {
@@ -80,14 +79,8 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
         Long tenantId = Long.parseLong(request.getTenantId());
         log.info("RPC updateUserStatus: userId={}, tenantId={}, status={}", userId, tenantId, request.getStatus());
         try {
-            User user = userMapper.findById(userId);
-            if (user == null) {
-                return OperationResult.newBuilder()
-                    .setSuccess(false)
-                    .setMessage("用户不存在")
-                    .build();
-            }
-
+            // 用户存在性与租户归属由 Service 层 loadUserAndVerifyTenant 统一校验
+            //（不存在/跨租户 → USER_NOT_FOUND，由 catch 转为失败响应）
             userService.updateUserStatus(userId, tenantId, request.getStatus());
 
             return OperationResult.newBuilder()

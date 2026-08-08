@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,9 +44,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserById(Long id) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        User user = userMapper.findByIdWithRolesAndPermissions(id, tenantId);
-        if (user == null) {
+        return getUserById(id, SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public UserResponse getUserById(Long userId, Long tenantId) {
+        User user = userMapper.findByIdWithRolesAndPermissions(userId, tenantId);
+        if (user == null || !user.getTenantId().equals(tenantId)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
         return mapToUserResponse(user);
@@ -53,44 +58,51 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserByUsername(String username) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        User user = userMapper.findByUsername(username, tenantId);
-        if (user == null) {
+        return getUserByUsername(username, SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public UserResponse getUserByUsername(String username, Long tenantId) {
+        // 一次查出用户及其角色权限（替代旧的 N+1 逐条加载角色）
+        User user = userMapper.findByUsernameWithRolesAndPermissions(username, tenantId);
+        if (user == null || !user.getTenantId().equals(tenantId)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
-        // Load roles
-        List<Long> roleIds = userMapper.findRoleIdsByUserId(user.getId());
-        Set<Role> roles = new HashSet<>();
-        for (Long roleId : roleIds) {
-            Role role = roleMapper.findById(roleId);
-            if (role != null) {
-                roles.add(role);
-            }
-        }
-        user.setRoles(roles);
         return mapToUserResponse(user);
     }
 
     @Override
     public PageResponse<UserResponse> searchUsers(String keyword, Integer page, Integer size) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return searchUsers(keyword, SecurityUtils.getCurrentTenantId(), page, size);
+    }
+
+    @Override
+    public PageResponse<UserResponse> searchUsers(String keyword, Long tenantId, Integer page, Integer size) {
         log.info("searchUsers called with: keyword={}, page={}, size={}, tenantId={}", keyword, page, size, tenantId);
         List<User> users;
         long total;
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            users = userMapper.findByKeyword(keyword, tenantId);
+            users = userMapper.findByKeywordWithRolesAndPermissions(keyword, tenantId);
             total = userMapper.countByKeyword(keyword, tenantId);
         } else {
-            // Get all users with roles for the tenant when no keyword is provided
-            users = userMapper.findAllByTenantIdWithRoles(tenantId);
+            // Get all users with roles and permissions for the tenant when no keyword is provided
+            users = userMapper.findAllByTenantIdWithRolesAndPermissions(tenantId);
             total = userMapper.countAllByTenantId(tenantId);
         }
 
         log.info("Found {} users for tenantId={}, total={}", users.size(), tenantId, total);
 
-        // Apply pagination
+        // Apply pagination (guard against out-of-range start)
         int start = (page - 1) * size;
+        if (start >= users.size()) {
+            return PageResponse.<UserResponse>builder()
+                    .total(total)
+                    .page(page)
+                    .size(size)
+                    .items(Collections.emptyList())
+                    .build();
+        }
         int end = Math.min(start + size, users.size());
         List<User> pagedUsers = users.subList(start, end);
 
@@ -242,6 +254,63 @@ public class UserServiceImpl implements UserService {
         userMapper.deleteById(userId);
 
         log.info("User deleted successfully: {}", userId);
+    }
+
+    @Override
+    public boolean hasPermission(Long userId, Long tenantId, String permission) {
+        User user = loadUserOrNull(userId, tenantId);
+        if (user == null || user.getStatus() == 0) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .anyMatch(p -> p.getCode().equals(permission));
+    }
+
+    @Override
+    public boolean hasRole(Long userId, Long tenantId, String role) {
+        User user = loadUserOrNull(userId, tenantId);
+        if (user == null || user.getStatus() == 0) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .anyMatch(r -> r.getCode().equals(role));
+    }
+
+    @Override
+    public List<String> getUserPermissions(Long userId, Long tenantId) {
+        User user = loadUserOrNull(userId, tenantId);
+        if (user == null) {
+            return Collections.emptyList();
+        }
+        return user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(p -> p.getCode())
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getUserRoles(Long userId, Long tenantId) {
+        User user = loadUserOrNull(userId, tenantId);
+        if (user == null) {
+            return Collections.emptyList();
+        }
+        return user.getRoles().stream()
+                .map(r -> r.getCode())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 加载用户（含角色权限）并校验租户归属
+     * 用户不存在或不属于指定租户时返回 null（供权限/角色查询安全降级，不抛异常）
+     */
+    private User loadUserOrNull(Long userId, Long tenantId) {
+        User user = userMapper.findByIdWithRolesAndPermissions(userId, tenantId);
+        if (user == null || !user.getTenantId().equals(tenantId)) {
+            return null;
+        }
+        return user;
     }
 
     /**

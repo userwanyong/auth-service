@@ -8,22 +8,20 @@ import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.BusinessException;
-import cn.wanyj.auth.mapper.UserMapper;
-import cn.wanyj.auth.security.JwtTokenProvider;
+import cn.wanyj.auth.rpc.converter.UserProtobufConverter;
 import cn.wanyj.auth.service.AuthService;
-import cn.wanyj.auth.service.TokenService;
+import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 认证服务 RPC 实现 - Protobuf IDL 模式
- * 使用 Protobuf 定义的消息类型进行序列化
+ * <p>查询类方法复用 {@link UserService}（带显式 tenantId），Protobuf 转换复用
+ * {@link UserProtobufConverter}，本类不再直接访问 Mapper。</p>
  *
  * @author wanyj
  */
@@ -38,9 +36,7 @@ import java.util.stream.Collectors;
 public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTriple.AuthRpcServiceProtobufImplBase {
 
     private final AuthService authService;
-    private final TokenService tokenService;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final UserMapper userMapper;
+    private final UserService userService;
 
     @Override
     public RegisterRpcResult register(RegisterRpcRequest request) {
@@ -65,7 +61,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                     .setRefreshToken(tokenResponse.getRefreshToken())
                     .setExpiresIn(tokenResponse.getExpiresIn())
                     .build())
-                .setUser(convertToProtobuf(tokenResponse.getUser()))
+                .setUser(UserProtobufConverter.convertToProtobuf(tokenResponse.getUser()))
                 .build();
         } catch (BusinessException e) {
             log.warn("Registration failed: {}", e.getMessage());
@@ -122,24 +118,16 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
 
-            // Load user with roles and permissions using provided tenantId
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                userId,
-                tenantId
-            );
-
-            if (user == null || user.getStatus() == 0) {
-                log.warn("User not found or disabled: userId={}, tenantId={}", userId, tenantId);
+            UserResponse user = userService.getUserById(userId, tenantId);
+            // 禁用用户对 RPC 调用方不可见（与改造前行为一致）
+            if (user.getStatus() != null && user.getStatus() == 0) {
+                log.warn("User disabled: userId={}, tenantId={}", userId, tenantId);
                 return UserRpcResponse.getDefaultInstance();
             }
-
-            // Verify user belongs to the specified tenant
-            if (!user.getTenantId().equals(tenantId)) {
-                log.warn("User {} does not belong to tenant {}", userId, tenantId);
-                return UserRpcResponse.getDefaultInstance();
-            }
-
-            return convertToProtobuf(user);
+            return UserProtobufConverter.convertToProtobuf(user);
+        } catch (BusinessException e) {
+            log.warn("getUserById failed: {}", e.getMessage());
+            return UserRpcResponse.getDefaultInstance();
         } catch (Exception e) {
             log.error("Failed to get user by id: userId={}, tenantId={}",
                 request.getUserId(), request.getTenantId(), e);
@@ -154,19 +142,16 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long tenantId = Long.parseLong(request.getTenantId());
 
-            // Load user with roles and permissions using username and tenantId
-            cn.wanyj.auth.entity.User user = userMapper.findByUsernameWithRolesAndPermissions(
-                request.getUsername(),
-                tenantId
-            );
-
-            if (user == null || user.getStatus() == 0) {
-                log.warn("User not found or disabled: username={}, tenantId={}",
-                    request.getUsername(), tenantId);
+            UserResponse user = userService.getUserByUsername(request.getUsername(), tenantId);
+            // 禁用用户对 RPC 调用方不可见（与改造前行为一致）
+            if (user.getStatus() != null && user.getStatus() == 0) {
+                log.warn("User disabled: username={}, tenantId={}", request.getUsername(), tenantId);
                 return UserRpcResponse.getDefaultInstance();
             }
-
-            return convertToProtobuf(user);
+            return UserProtobufConverter.convertToProtobuf(user);
+        } catch (BusinessException e) {
+            log.warn("getUserByUsername failed: {}", e.getMessage());
+            return UserRpcResponse.getDefaultInstance();
         } catch (Exception e) {
             log.error("Failed to get user by username: username={}, tenantId={}",
                 request.getUsername(), request.getTenantId(), e);
@@ -181,22 +166,9 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
-
-            // Use tenantId from request
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                userId,
-                tenantId
-            );
-
-            if (user == null || user.getStatus() == 0 || !user.getTenantId().equals(tenantId)) {
-                return BoolValue.newBuilder().setValue(false).build();
-            }
-
-            boolean hasPermission = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .anyMatch(p -> p.getCode().equals(request.getPermission()));
-
-            return BoolValue.newBuilder().setValue(hasPermission).build();
+            // Service 内部已处理：用户不存在/跨租户/禁用 → false
+            boolean has = userService.hasPermission(userId, tenantId, request.getPermission());
+            return BoolValue.newBuilder().setValue(has).build();
         } catch (Exception e) {
             log.error("Failed to check permission", e);
             return BoolValue.newBuilder().setValue(false).build();
@@ -210,21 +182,8 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
-
-            // Use tenantId from request
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                userId,
-                tenantId
-            );
-
-            if (user == null || user.getStatus() == 0 || !user.getTenantId().equals(tenantId)) {
-                return BoolValue.newBuilder().setValue(false).build();
-            }
-
-            boolean hasRole = user.getRoles().stream()
-                .anyMatch(r -> r.getCode().equals(request.getRole()));
-
-            return BoolValue.newBuilder().setValue(hasRole).build();
+            boolean has = userService.hasRole(userId, tenantId, request.getRole());
+            return BoolValue.newBuilder().setValue(has).build();
         } catch (Exception e) {
             log.error("Failed to check role", e);
             return BoolValue.newBuilder().setValue(false).build();
@@ -237,25 +196,9 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
-
-            // Use tenantId from request
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                userId,
-                tenantId
-            );
-
-            if (user == null || !user.getTenantId().equals(tenantId)) {
-                log.warn("User not found or tenant mismatch: userId={}, tenantId={}", userId, tenantId);
-                return StringListResponse.getDefaultInstance();
-            }
-
-            return StringListResponse.newBuilder()
-                .addAllValues(user.getRoles().stream()
-                    .flatMap(r -> r.getPermissions().stream())
-                    .map(p -> p.getCode())
-                    .distinct()
-                    .collect(Collectors.toList()))
-                .build();
+            // Service 对用户不存在/跨租户返回空列表
+            List<String> permissions = userService.getUserPermissions(userId, tenantId);
+            return StringListResponse.newBuilder().addAllValues(permissions).build();
         } catch (Exception e) {
             log.error("Failed to get user permissions", e);
             return StringListResponse.getDefaultInstance();
@@ -268,23 +211,8 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
-
-            // Use tenantId from request
-            cn.wanyj.auth.entity.User user = userMapper.findByIdWithRolesAndPermissions(
-                userId,
-                tenantId
-            );
-
-            if (user == null || !user.getTenantId().equals(tenantId)) {
-                log.warn("User not found or tenant mismatch: userId={}, tenantId={}", userId, tenantId);
-                return StringListResponse.getDefaultInstance();
-            }
-
-            return StringListResponse.newBuilder()
-                .addAllValues(user.getRoles().stream()
-                    .map(r -> r.getCode())
-                    .collect(Collectors.toList()))
-                .build();
+            List<String> roles = userService.getUserRoles(userId, tenantId);
+            return StringListResponse.newBuilder().addAllValues(roles).build();
         } catch (Exception e) {
             log.error("Failed to get user roles", e);
             return StringListResponse.getDefaultInstance();
@@ -302,7 +230,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         try {
             Long tenantId = Long.parseLong(request.getTenantId());
 
-            PageResponse<UserResponse> pageResponse = searchUsersByTenant(keyword, tenantId, page, size);
+            PageResponse<UserResponse> pageResponse = userService.searchUsers(keyword, tenantId, page, size);
 
             UserPageResponse.Builder builder = UserPageResponse.newBuilder()
                 .setTotal(pageResponse.getTotal() != null ? pageResponse.getTotal() : 0L)
@@ -311,7 +239,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
             if (pageResponse.getItems() != null) {
                 builder.addAllItems(pageResponse.getItems().stream()
-                    .map(this::convertToProtobuf)
+                    .map(UserProtobufConverter::convertToProtobuf)
                     .collect(Collectors.toList()));
             }
 
@@ -400,130 +328,6 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 .setMessage("密码修改失败")
                 .build();
         }
-    }
-
-    private PageResponse<UserResponse> searchUsersByTenant(String keyword, Long tenantId, int page, int size) {
-        List<cn.wanyj.auth.entity.User> users;
-        long total;
-
-        if (keyword != null && !keyword.isBlank()) {
-            users = userMapper.findByKeywordWithRolesAndPermissions(keyword, tenantId);
-            total = userMapper.countByKeyword(keyword, tenantId);
-        } else {
-            users = userMapper.findAllByTenantIdWithRolesAndPermissions(tenantId);
-            total = userMapper.countAllByTenantId(tenantId);
-        }
-
-        int start = Math.max(0, (page - 1) * size);
-        if (start >= users.size()) {
-            return PageResponse.<UserResponse>builder()
-                .total(total)
-                .page(page)
-                .size(size)
-                .items(Collections.emptyList())
-                .build();
-        }
-
-        int end = Math.min(start + size, users.size());
-        List<UserResponse> items = users.subList(start, end).stream()
-            .map(this::convertToSimpleUserResponse)
-            .collect(Collectors.toList());
-
-        return PageResponse.<UserResponse>builder()
-            .total(total)
-            .page(page)
-            .size(size)
-            .items(items)
-            .build();
-    }
-
-    private UserRpcResponse convertToProtobuf(UserResponse user) {
-        return UserRpcResponse.newBuilder()
-            .setId(user.getId())
-            .setUsername(user.getUsername())
-            .setEmail(user.getEmail() != null ? user.getEmail() : "")
-            .setPhone(user.getPhone() != null ? user.getPhone() : "")
-            .setNickname(user.getNickname() != null ? user.getNickname() : "")
-            .setAvatar(user.getAvatar() != null ? user.getAvatar() : "")
-            .setStatus(user.getStatus())
-            .addAllRoles(user.getRoles() != null
-                ? user.getRoles()
-                : java.util.Collections.emptyList())
-            .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : java.util.Collections.emptyList())
-            .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
-            .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
-            .setLastLoginAt(toEpochMilli(user.getLastLoginAt()))
-            .setCreatedAt(toEpochMilli(user.getCreatedAt()))
-            .build();
-    }
-
-    private UserRpcResponse convertToProtobuf(TokenResponse.UserInfo user) {
-        return UserRpcResponse.newBuilder()
-            .setId(user.getId())
-            .setUsername(user.getUsername())
-            .setEmail(user.getEmail() != null ? user.getEmail() : "")
-            .setNickname(user.getNickname() != null ? user.getNickname() : "")
-            .setAvatar(user.getAvatar() != null ? user.getAvatar() : "")
-            .addAllRoles(user.getRoles() != null ? user.getRoles() : java.util.Collections.emptySet())
-            .build();
-    }
-
-    private UserRpcResponse convertToProtobuf(cn.wanyj.auth.entity.User user) {
-        return UserRpcResponse.newBuilder()
-            .setId(user.getId())
-            .setUsername(user.getUsername())
-            .setEmail(user.getEmail() != null ? user.getEmail() : "")
-            .setPhone(user.getPhone() != null ? user.getPhone() : "")
-            .setNickname(user.getNickname() != null ? user.getNickname() : "")
-            .setAvatar(user.getAvatar() != null ? user.getAvatar() : "")
-            .setStatus(user.getStatus())
-            .addAllRoles(user.getRoles().stream()
-                .map(r -> r.getCode())
-                .collect(Collectors.toList()))
-            .addAllPermissions(user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getCode())
-                .distinct()
-                .collect(Collectors.toList()))
-            .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
-            .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
-            .setLastLoginAt(toEpochMilli(user.getLastLoginAt()))
-            .setCreatedAt(toEpochMilli(user.getCreatedAt()))
-            .build();
-    }
-
-    private UserResponse convertToSimpleUserResponse(cn.wanyj.auth.entity.User user) {
-        Set<String> permissions = Collections.emptySet();
-        if (user.getRoles() != null) {
-            permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions() != null
-                    ? r.getPermissions().stream()
-                    : java.util.stream.Stream.empty())
-                .map(p -> p.getCode())
-                .collect(Collectors.toSet());
-        }
-
-        return UserResponse.builder()
-            .id(user.getId())
-            .tenantId(user.getTenantId())
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .phone(user.getPhone())
-            .nickname(user.getNickname())
-            .avatar(user.getAvatar())
-            .status(user.getStatus())
-            .emailVerified(user.getEmailVerified())
-            .lastLoginAt(user.getLastLoginAt())
-            .createdAt(user.getCreatedAt())
-            .roles(user.getRoles() != null
-                ? user.getRoles().stream().map(r -> r.getCode()).collect(Collectors.toSet())
-                : Collections.emptySet())
-            .permissions(permissions)
-            .build();
-    }
-
-    private static long toEpochMilli(java.time.LocalDateTime ldt) {
-        return ldt != null ? ldt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : 0L;
     }
 
     private String emptyToNull(String value) {

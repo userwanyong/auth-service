@@ -3,22 +3,20 @@ package cn.wanyj.auth.rpc;
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.AssignPermissionsRequest;
 import cn.wanyj.auth.dto.response.RoleResponse;
-import cn.wanyj.auth.entity.Role;
 import cn.wanyj.auth.exception.BusinessException;
-import cn.wanyj.auth.mapper.PermissionMapper;
-import cn.wanyj.auth.mapper.RoleMapper;
+import cn.wanyj.auth.rpc.converter.RoleProtobufConverter;
 import cn.wanyj.auth.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 角色服务 RPC 实现 - Protobuf IDL 模式
+ * <p>查询类方法复用 {@link RoleService}（带显式 tenantId），Protobuf 转换复用
+ * {@link RoleProtobufConverter}，本类不再直接访问 Mapper。</p>
  *
  * @author wanyj
  */
@@ -32,8 +30,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTriple.RoleRpcServiceProtobufImplBase {
 
-    private final RoleMapper roleMapper;
-    private final PermissionMapper permissionMapper;
     private final RoleService roleService;
 
     @Override
@@ -41,13 +37,12 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
         log.info("RPC getAllRoles: tenantId={}", request.getTenantId());
         try {
             Long tenantId = Long.parseLong(request.getTenantId());
-            List<Role> roles = roleMapper.findAllWithPermissions(tenantId);
+            List<RoleResponse> roles = roleService.getAllRoles(tenantId);
 
             RoleListResponse.Builder builder = RoleListResponse.newBuilder();
-            for (Role role : roles) {
-                builder.addRoles(convertToProtobuf(role));
+            for (RoleResponse role : roles) {
+                builder.addRoles(RoleProtobufConverter.convertToProtobuf(role));
             }
-
             return builder.build();
         } catch (Exception e) {
             log.error("Failed to get all roles for tenant: {}", request.getTenantId(), e);
@@ -60,24 +55,11 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
         log.info("RPC getRoleByCode: code={}, tenantId={}", request.getCode(), request.getTenantId());
         try {
             Long tenantId = Long.parseLong(request.getTenantId());
-            Role role = roleMapper.findByCode(request.getCode(), tenantId);
-            if (role == null) {
-                log.warn("Role not found: code={}, tenantId={}", request.getCode(), request.getTenantId());
-                return RoleRpcResponse.getDefaultInstance();
-            }
-
-            // Load permissions
-            List<Long> permissionIds = roleMapper.findPermissionIdsByRoleId(role.getId());
-            Set<cn.wanyj.auth.entity.Permission> permissions = new HashSet<>();
-            for (Long permissionId : permissionIds) {
-                cn.wanyj.auth.entity.Permission permission = permissionMapper.findById(permissionId);
-                if (permission != null) {
-                    permissions.add(permission);
-                }
-            }
-            role.setPermissions(permissions);
-
-            return convertToProtobuf(role);
+            RoleResponse role = roleService.getRoleByCode(request.getCode(), tenantId);
+            return RoleProtobufConverter.convertToProtobuf(role);
+        } catch (BusinessException e) {
+            log.warn("getRoleByCode failed: {}", e.getMessage());
+            return RoleRpcResponse.getDefaultInstance();
         } catch (Exception e) {
             log.error("Failed to get role by code: code={}, tenantId={}",
                 request.getCode(), request.getTenantId(), e);
@@ -93,16 +75,11 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
             // tenantId 为空（旧客户端）时跳过归属校验，非空时强制校验
             Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
 
-            Role role = roleMapper.findByIdWithPermissions(roleId);
-            if (role == null) {
-                log.warn("Role not found: roleId={}", request.getRoleId());
-                return RoleRpcResponse.getDefaultInstance();
-            }
-            if (tenantId != null && !tenantId.equals(role.getTenantId())) {
-                log.warn("Role {} does not belong to tenant {}", roleId, tenantId);
-                return RoleRpcResponse.getDefaultInstance();
-            }
-            return convertToProtobuf(role);
+            RoleResponse role = roleService.getRoleById(roleId, tenantId);
+            return RoleProtobufConverter.convertToProtobuf(role);
+        } catch (BusinessException e) {
+            log.warn("getRoleById failed: {}", e.getMessage());
+            return RoleRpcResponse.getDefaultInstance();
         } catch (Exception e) {
             log.error("Failed to get role by id: roleId={}", request.getRoleId(), e);
             return RoleRpcResponse.getDefaultInstance();
@@ -119,14 +96,7 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
                 request.getDescription(),
                 Long.parseLong(request.getTenantId())
             );
-            return RoleRpcResponse.newBuilder()
-                .setId(roleResponse.getId())
-                .setCode(roleResponse.getCode())
-                .setName(roleResponse.getName())
-                .setDescription(roleResponse.getDescription() != null ? roleResponse.getDescription() : "")
-                .setStatus(roleResponse.getStatus())
-                .addAllPermissions(roleResponse.getPermissions() != null ? roleResponse.getPermissions() : java.util.Collections.emptyList())
-                .build();
+            return RoleProtobufConverter.convertToProtobuf(roleResponse);
         } catch (BusinessException e) {
             log.warn("Create role failed: {}", e.getMessage());
             return RoleRpcResponse.getDefaultInstance();
@@ -215,25 +185,5 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
                 .setMessage("权限分配失败")
                 .build();
         }
-    }
-
-    private RoleRpcResponse convertToProtobuf(Role role) {
-        RoleRpcResponse.Builder builder = RoleRpcResponse.newBuilder()
-            .setId(role.getId())
-            .setCode(role.getCode())
-            .setName(role.getName())
-            .setStatus(role.getStatus());
-
-        if (role.getDescription() != null) {
-            builder.setDescription(role.getDescription());
-        }
-
-        if (role.getPermissions() != null) {
-            builder.addAllPermissions(role.getPermissions().stream()
-                .map(cn.wanyj.auth.entity.Permission::getCode)
-                .collect(Collectors.toList()));
-        }
-
-        return builder.build();
     }
 }

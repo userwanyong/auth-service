@@ -31,7 +31,11 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public List<PermissionResponse> getAllPermissions() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return getAllPermissions(SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public List<PermissionResponse> getAllPermissions(Long tenantId) {
         return permissionMapper.findAll(tenantId).stream()
                 .map(this::mapToPermissionResponse)
                 .collect(Collectors.toList());

@@ -82,4 +82,16 @@ public interface RoleService {
      * 为角色分配权限（带显式租户ID，含角色与权限归属校验）
      */
     void assignPermissions(Long roleId, AssignPermissionsRequest request, Long tenantId);
+
+    /**
+     * Get all roles with explicit tenantId (for RPC context)
+     * 获取所有角色（带显式租户ID）
+     */
+    List<RoleResponse> getAllRoles(Long tenantId);
+
+    /**
+     * Get role by code with explicit tenantId (for RPC context)
+     * 根据编码获取角色（带显式租户ID）
+     */
+    RoleResponse getRoleByCode(String code, Long tenantId);
 }

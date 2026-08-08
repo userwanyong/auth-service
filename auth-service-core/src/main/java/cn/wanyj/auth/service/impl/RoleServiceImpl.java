@@ -37,7 +37,11 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public List<RoleResponse> getAllRoles() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return getAllRoles(SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public List<RoleResponse> getAllRoles(Long tenantId) {
         return roleMapper.findAllWithPermissions(tenantId).stream()
                 .map(this::mapToRoleResponse)
                 .collect(Collectors.toList());
@@ -59,7 +63,11 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public RoleResponse getRoleByCode(String code) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return getRoleByCode(code, SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public RoleResponse getRoleByCode(String code, Long tenantId) {
         Role role = roleMapper.findByCode(code, tenantId);
         if (role == null) {
             throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
