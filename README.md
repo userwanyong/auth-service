@@ -324,6 +324,37 @@ mvn spring-boot:run -pl auth-service-core
 | `createPermission` | 创建权限 | `CreatePermissionRpcRequest` | `PermissionRpcResponse` |
 | `deletePermission` | 删除权限 | `DeletePermissionRpcRequest` | `OperationResult` |
 
+#### 多租户归属校验
+
+为防止跨租户越权,所有「按 ID 操作资源」的 RPC 都需在请求中携带 `tenantId`,服务端会校验资源归属:
+
+- 用户:`getUserById` / `getUserByUsername` / `updateUser` / `updateUserStatus` / `assignRoles` / `deleteUser`
+- 角色:`getRoleById` / `updateRole` / `deleteRole` / `assignPermissions`
+- 权限:`getPermissionById` / `deletePermission`
+- 令牌:`revokeAllTokens`
+
+> 当 `tenantId` 为空(旧客户端)时跳过校验;非空时强制校验,资源不属于该租户则视为不存在(返回空/失败,不抛 Forbidden,避免泄露存在性)。
+
+#### updateUser 字段掩码
+
+`UpdateUserRpcRequest` 通过 `fields_to_update`(字段掩码)声明本次要更新的字段,**仅出现在列表中的字段才会被更新**,其余保持不变。这解决了 proto3 中 `status=0`(禁用用户)、空字符串(清空字段)等默认值无法表达的陷阱:
+
+```java
+UpdateUserRpcRequest.newBuilder()
+    .setUserId("123456")
+    .setTenantId("1")
+    .setNickname("新昵称")        // 设置新值
+    .setStatus(0)                // 0 = 禁用(因出现在掩码中,不会被当作「未提供」)
+    .addFieldsToUpdate("nickname")
+    .addFieldsToUpdate("status")
+    .build();
+// 结果:仅 nickname 和 status 被更新,其余字段不变
+```
+
+#### UserRpcResponse 字段
+
+`UserRpcResponse` 返回完整用户信息:`id`、`username`、`email`、`phone`、`nickname`、`avatar`、`status`、`roles`、`permissions`、`tenantId`、`emailVerified`、`lastLoginAt`(epoch 毫秒)、`createdAt`(epoch 毫秒)。
+
 #### 调用示例
 
 ```java

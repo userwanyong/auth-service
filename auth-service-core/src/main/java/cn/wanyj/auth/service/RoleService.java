@@ -58,4 +58,28 @@ public interface RoleService {
      * 为角色分配权限
      */
     void assignPermissions(Long roleId, AssignPermissionsRequest request);
+
+    /**
+     * Get role by id with explicit tenantId (for RPC context)
+     * 根据ID获取角色（带显式租户ID，含归属校验）
+     */
+    RoleResponse getRoleById(Long id, Long tenantId);
+
+    /**
+     * Update role with explicit tenantId (for RPC context)
+     * 更新角色（带显式租户ID，含归属校验）
+     */
+    RoleResponse updateRole(Long id, String name, String description, Long tenantId);
+
+    /**
+     * Delete role with explicit tenantId (for RPC context)
+     * 删除角色（带显式租户ID，含归属校验）
+     */
+    void deleteRole(Long id, Long tenantId);
+
+    /**
+     * Assign permissions to role with explicit tenantId (for RPC context)
+     * 为角色分配权限（带显式租户ID，含角色与权限归属校验）
+     */
+    void assignPermissions(Long roleId, AssignPermissionsRequest request, Long tenantId);
 }

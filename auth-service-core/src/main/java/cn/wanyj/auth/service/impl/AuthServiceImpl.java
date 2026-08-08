@@ -19,6 +19,7 @@ import cn.wanyj.auth.service.AuthService;
 import cn.wanyj.auth.service.LoginRateLimiter;
 import cn.wanyj.auth.service.TokenService;
 import cn.wanyj.auth.service.TenantService;
+import cn.wanyj.auth.util.UserFieldValidator;
 import io.github.xiapxx.uid.generator.api.UidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,8 +67,8 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.TENANT_USER_LIMIT_REACHED);
         }
 
-        // Validate optional fields only if they are provided
-        validateOptionalFields(request);
+        // Validate optional contact fields (email/phone) only if provided
+        UserFieldValidator.validateContactFields(request.getEmail(), request.getPhone());
 
         // Check if username already exists in current tenant
         if (userMapper.existsByUsername(request.getUsername(), tenantId)) {
@@ -139,26 +140,6 @@ public class AuthServiceImpl implements AuthService {
                         .roles(roles)
                         .build())
                 .build();
-    }
-
-    /**
-     * Validate optional fields (email, phone) only if they are provided
-     * 验证选填字段，只在提供了值的情况下进行校验
-     */
-    private void validateOptionalFields(RegisterRequest request) {
-        // Validate email format if provided
-        if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                throw new BusinessException(ErrorCode.INVALID_EMAIL_FORMAT);
-            }
-        }
-
-        // Validate phone format if provided
-        if (request.getPhone() != null && !request.getPhone().isBlank()) {
-            if (!request.getPhone().matches("^1[3-9]\\d{9}$")) {
-                throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
-            }
-        }
     }
 
     @Override

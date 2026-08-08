@@ -50,12 +50,19 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
 
     @Override
     public PermissionRpcResponse getPermissionById(GetPermissionByIdRequest request) {
-        log.info("RPC getPermissionById: permissionId={}", request.getPermissionId());
+        log.info("RPC getPermissionById: permissionId={}, tenantId={}", request.getPermissionId(), request.getTenantId());
         try {
             Long permissionId = Long.parseLong(request.getPermissionId());
+            // tenantId 为空（旧客户端）时跳过归属校验，非空时强制校验
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+
             Permission permission = permissionMapper.findById(permissionId);
             if (permission == null) {
                 log.warn("Permission not found: permissionId={}", permissionId);
+                return PermissionRpcResponse.getDefaultInstance();
+            }
+            if (tenantId != null && !tenantId.equals(permission.getTenantId())) {
+                log.warn("Permission {} does not belong to tenant {}", permissionId, tenantId);
                 return PermissionRpcResponse.getDefaultInstance();
             }
             return convertToProtobuf(permission);
@@ -99,7 +106,8 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
         log.info("RPC deletePermission: permissionId={}", request.getPermissionId());
         try {
             Long permissionId = Long.parseLong(request.getPermissionId());
-            permissionService.deletePermission(permissionId);
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            permissionService.deletePermission(permissionId, tenantId);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("权限删除成功")

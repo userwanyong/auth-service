@@ -39,4 +39,16 @@ public interface PermissionService {
      * 根据ID删除权限
      */
     void deletePermission(Long id);
+
+    /**
+     * Get permission by id with explicit tenantId (for RPC context)
+     * 根据ID获取权限（带显式租户ID，含归属校验）
+     */
+    PermissionResponse getPermissionById(Long id, Long tenantId);
+
+    /**
+     * Delete permission by id with explicit tenantId (for RPC context)
+     * 删除权限（带显式租户ID，含归属校验）
+     */
+    void deletePermission(Long id, Long tenantId);
 }

@@ -64,6 +64,14 @@ message UserRpcResponse {
   int32 status = 7;
   repeated string roles = 8;
   repeated string permissions = 9;
+  // 所属租户ID（多租户隔离）
+  int64 tenantId = 10;
+  // 邮箱是否已验证
+  bool emailVerified = 11;
+  // 最后登录时间（epoch millis，0 表示未知）
+  int64 lastLoginAt = 12;
+  // 创建时间（epoch millis，0 表示未知）
+  int64 createdAt = 13;
 }
 
 // Token response
@@ -152,6 +160,10 @@ message UpdateUserRpcRequest {
   string nickname = 7;
   string avatar = 8;
   int32 status = 9;
+  // 字段掩码：声明本次需要更新的字段名（如 ["nickname", "status"]）。
+  // 仅出现在列表中的字段会被更新，其余保持不变。解决了 proto3 中
+  // status=0（禁用）、空字符串（清空）等默认值无法表达的陷阱。
+  repeated string fields_to_update = 10;
 }
 
 // Update user status request
@@ -227,6 +239,8 @@ message GetRoleByCodeRequest {
 // Get role by ID request
 message GetRoleByIdRequest {
   string roleId = 1;
+  // 租户ID，用于归属校验（防止跨租户访问）
+  string tenantId = 2;
 }
 
 // Create role request
@@ -242,11 +256,15 @@ message UpdateRoleRpcRequest {
   string roleId = 1;
   string name = 2;
   string description = 3;
+  // 租户ID，用于归属校验（防止跨租户访问）
+  string tenantId = 4;
 }
 
 // Delete role request
 message DeleteRoleRpcRequest {
   string roleId = 1;
+  // 租户ID，用于归属校验（防止跨租户访问）
+  string tenantId = 2;
 }
 
 // Assign permissions to role request
@@ -281,6 +299,8 @@ message GetAllPermissionsRequest {
 // Get permission by ID request
 message GetPermissionByIdRequest {
   string permissionId = 1;
+  // 租户ID，用于归属校验（防止跨租户访问）
+  string tenantId = 2;
 }
 
 // Create permission request
@@ -296,6 +316,8 @@ message CreatePermissionRpcRequest {
 // Delete permission request
 message DeletePermissionRpcRequest {
   string permissionId = 1;
+  // 租户ID，用于归属校验（防止跨租户访问）
+  string tenantId = 2;
 }
 
 // Permissions list response
@@ -365,6 +387,8 @@ message ParseTokenRpcRequest {
 // Revoke all tokens RPC request
 message RevokeAllTokensRpcRequest {
   string userId = 1;
+  // 租户ID，用于归属校验（防止跨租户操作）
+  string tenantId = 2;
 }
 
 // ==================== Wrapper Types ====================

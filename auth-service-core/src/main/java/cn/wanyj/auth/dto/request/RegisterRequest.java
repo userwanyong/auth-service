@@ -34,10 +34,12 @@ public class RegisterRequest {
     @NotNull(message = "租户ID不能为空")
     private Long tenantId;
 
-    // 选填字段，在 Service 层手动校验
+    // 选填字段（格式在 Service 层校验）
+    @Size(max = 100, message = "邮箱长度不能超过100")
     private String email;
 
-    // 选填字段，在 Service 层手动校验
+    // 选填字段（格式在 Service 层校验）
+    @Size(max = 20, message = "手机号长度不能超过20")
     private String phone;
 
     // 选填字段

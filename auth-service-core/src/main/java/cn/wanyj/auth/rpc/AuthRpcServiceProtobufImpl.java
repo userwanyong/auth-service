@@ -188,7 +188,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 tenantId
             );
 
-            if (user == null || user.getStatus() == 0) {
+            if (user == null || user.getStatus() == 0 || !user.getTenantId().equals(tenantId)) {
                 return BoolValue.newBuilder().setValue(false).build();
             }
 
@@ -217,7 +217,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 tenantId
             );
 
-            if (user == null || user.getStatus() == 0) {
+            if (user == null || user.getStatus() == 0 || !user.getTenantId().equals(tenantId)) {
                 return BoolValue.newBuilder().setValue(false).build();
             }
 
@@ -244,8 +244,8 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 tenantId
             );
 
-            if (user == null) {
-                log.warn("User not found: userId={}, tenantId={}", userId, tenantId);
+            if (user == null || !user.getTenantId().equals(tenantId)) {
+                log.warn("User not found or tenant mismatch: userId={}, tenantId={}", userId, tenantId);
                 return StringListResponse.getDefaultInstance();
             }
 
@@ -275,8 +275,8 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 tenantId
             );
 
-            if (user == null) {
-                log.warn("User not found: userId={}, tenantId={}", userId, tenantId);
+            if (user == null || !user.getTenantId().equals(tenantId)) {
+                log.warn("User not found or tenant mismatch: userId={}, tenantId={}", userId, tenantId);
                 return StringListResponse.getDefaultInstance();
             }
 
@@ -450,6 +450,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 ? user.getRoles()
                 : java.util.Collections.emptyList())
             .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : java.util.Collections.emptyList())
+            .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
+            .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
+            .setLastLoginAt(toEpochMilli(user.getLastLoginAt()))
+            .setCreatedAt(toEpochMilli(user.getCreatedAt()))
             .build();
     }
 
@@ -481,6 +485,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 .map(p -> p.getCode())
                 .distinct()
                 .collect(Collectors.toList()))
+            .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
+            .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
+            .setLastLoginAt(toEpochMilli(user.getLastLoginAt()))
+            .setCreatedAt(toEpochMilli(user.getCreatedAt()))
             .build();
     }
 
@@ -512,6 +520,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                 : Collections.emptySet())
             .permissions(permissions)
             .build();
+    }
+
+    private static long toEpochMilli(java.time.LocalDateTime ldt) {
+        return ldt != null ? ldt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : 0L;
     }
 
     private String emptyToNull(String value) {

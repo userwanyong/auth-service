@@ -58,4 +58,22 @@ public interface UserService {
      * 删除用户
      */
     void deleteUser(Long userId);
+
+    /**
+     * Update user status with explicit tenantId (for RPC context)
+     * 更新用户状态（带显式租户ID，含归属校验）
+     */
+    void updateUserStatus(Long userId, Long tenantId, Integer status);
+
+    /**
+     * Assign roles with explicit tenantId (for RPC context)
+     * 分配角色（带显式租户ID，含用户与角色归属校验）
+     */
+    void assignRoles(Long userId, Long tenantId, AssignRolesRequest request);
+
+    /**
+     * Delete user with explicit tenantId (for RPC context)
+     * 删除用户（带显式租户ID，含归属校验）
+     */
+    void deleteUser(Long userId, Long tenantId);
 }

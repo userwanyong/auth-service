@@ -142,11 +142,18 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
     @Override
     public Empty revokeAllTokens(RevokeAllTokensRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        log.info("RPC revoke all tokens: userId={}", userId);
+        log.info("RPC revoke all tokens: userId={}, tenantId={}", userId, request.getTenantId());
         try {
             User user = userMapper.findById(userId);
             if (user == null) {
                 log.error("User not found: {}", userId);
+                return Empty.getDefaultInstance();
+            }
+            // 校验调用方声明的 tenantId 与用户实际归属一致（空则跳过，兼容旧客户端）
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            if (tenantId != null && !tenantId.equals(user.getTenantId())) {
+                log.warn("Tenant mismatch for revokeAllTokens: user belongs to {}, request specified {}",
+                    user.getTenantId(), tenantId);
                 return Empty.getDefaultInstance();
             }
             tokenService.revokeAllTokens(user.getTenantId(), userId);

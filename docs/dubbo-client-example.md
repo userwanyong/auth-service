@@ -2,6 +2,8 @@
 
 本文档说明如何在其他微服务中通过 Dubbo RPC 调用认证服务。
 
+> ⚠️ **注意**:本文档部分早期示例使用了 `Int64Value`/`StringValue` 包装类型与 `validateToken` 等方法,与当前 proto 定义(请求消息均带 `tenantId` 字段,如 `UserByIdRequest`)已不一致。**最新接口请以 `auth-service-api/src/main/proto/auth/auth_service.proto` 与 README 为准。** 文末「字段掩码与多租户校验」小节为最新用法。
+
 ## 架构说明
 
 ```
@@ -380,6 +382,44 @@ public class AuthFilter implements GlobalFilter {
     }
 }
 ```
+
+---
+
+## 字段掩码与多租户校验(最新用法)
+
+> 以下为当前 proto 的推荐用法(请求均带 `tenantId`)。
+
+### updateUser —— 字段掩码
+
+`UpdateUserRpcRequest` 用 `fields_to_update` 声明本次更新的字段,仅掩码内字段被更新,解决 proto3 默认值无法表达「禁用(status=0)」「清空(空串)」的问题:
+
+```java
+UpdateUserRpcRequest req = UpdateUserRpcRequest.newBuilder()
+    .setUserId("123456")
+    .setTenantId("1")
+    .setNickname("新昵称")
+    .setStatus(0)                      // 0 = 禁用
+    .addFieldsToUpdate("nickname")
+    .addFieldsToUpdate("status")
+    .build();
+userRpcService.updateUser(req);        // 只改 nickname 和 status,其余字段不变
+```
+
+### 多租户归属校验
+
+按 ID 操作资源的 RPC 均需在请求中传 `tenantId`,服务端校验资源是否属于该租户,不属于则视为不存在(返回空/失败,不抛 Forbidden,避免泄露存在性):
+
+```java
+// 获取某租户下的用户
+UserRpcResponse user = authRpcService.getUserById(
+    UserByIdRequest.newBuilder().setUserId("123456").setTenantId("1").build());
+
+// 删除角色(需传 tenantId 校验归属)
+roleRpcService.deleteRole(
+    DeleteRoleRpcRequest.newBuilder().setRoleId("10").setTenantId("1").build());
+```
+
+> 当 `tenantId` 为空(旧客户端)时跳过校验;非空时强制校验。
 
 ---
 

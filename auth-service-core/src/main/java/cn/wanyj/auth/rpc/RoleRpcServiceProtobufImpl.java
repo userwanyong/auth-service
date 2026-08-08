@@ -87,12 +87,19 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
 
     @Override
     public RoleRpcResponse getRoleById(GetRoleByIdRequest request) {
-        log.info("RPC getRoleById: roleId={}", request.getRoleId());
+        log.info("RPC getRoleById: roleId={}, tenantId={}", request.getRoleId(), request.getTenantId());
         try {
             Long roleId = Long.parseLong(request.getRoleId());
+            // tenantId 为空（旧客户端）时跳过归属校验，非空时强制校验
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+
             Role role = roleMapper.findByIdWithPermissions(roleId);
             if (role == null) {
                 log.warn("Role not found: roleId={}", request.getRoleId());
+                return RoleRpcResponse.getDefaultInstance();
+            }
+            if (tenantId != null && !tenantId.equals(role.getTenantId())) {
+                log.warn("Role {} does not belong to tenant {}", roleId, tenantId);
                 return RoleRpcResponse.getDefaultInstance();
             }
             return convertToProtobuf(role);
@@ -133,7 +140,8 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
     public OperationResult updateRole(UpdateRoleRpcRequest request) {
         log.info("RPC updateRole: roleId={}", request.getRoleId());
         try {
-            roleService.updateRole(Long.parseLong(request.getRoleId()), request.getName(), request.getDescription());
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            roleService.updateRole(Long.parseLong(request.getRoleId()), request.getName(), request.getDescription(), tenantId);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("角色更新成功")
@@ -157,7 +165,8 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
     public OperationResult deleteRole(DeleteRoleRpcRequest request) {
         log.info("RPC deleteRole: roleId={}", request.getRoleId());
         try {
-            roleService.deleteRole(Long.parseLong(request.getRoleId()));
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            roleService.deleteRole(Long.parseLong(request.getRoleId()), tenantId);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("角色删除成功")
@@ -183,12 +192,12 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
             request.getRoleId(), request.getTenantId(), request.getPermissionIdsList());
         try {
             Long roleId = Long.parseLong(request.getRoleId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
             AssignPermissionsRequest assignRequest = AssignPermissionsRequest.builder()
                 .permissionIds(request.getPermissionIdsList().stream().map(Long::parseLong).collect(Collectors.toList()))
                 .build();
 
-            roleService.assignPermissions(roleId, assignRequest);
+            roleService.assignPermissions(roleId, assignRequest, tenantId);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("权限分配成功")

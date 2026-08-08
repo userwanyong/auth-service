@@ -45,8 +45,13 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public RoleResponse getRoleById(Long id) {
+        return getRoleById(id, SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public RoleResponse getRoleById(Long id, Long tenantId) {
         Role role = roleMapper.findByIdWithPermissions(id);
-        if (role == null) {
+        if (role == null || (tenantId != null && !tenantId.equals(role.getTenantId()))) {
             throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
         }
         return mapToRoleResponse(role);
@@ -107,12 +112,15 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public RoleResponse updateRole(Long id, String name, String description) {
-        log.info("Updating role: {}", id);
+        return updateRole(id, name, description, SecurityUtils.getCurrentTenantId());
+    }
 
-        Role role = roleMapper.findById(id);
-        if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public RoleResponse updateRole(Long id, String name, String description, Long tenantId) {
+        log.info("Updating role: {} in tenant: {}", id, tenantId);
+
+        Role role = loadRoleAndVerifyTenant(id, tenantId);
 
         role.setName(name);
         role.setDescription(description);
@@ -127,12 +135,15 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void deleteRole(Long id) {
-        log.info("Deleting role: {}", id);
+        deleteRole(id, SecurityUtils.getCurrentTenantId());
+    }
 
-        Role role = roleMapper.findById(id);
-        if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void deleteRole(Long id, Long tenantId) {
+        log.info("Deleting role: {} in tenant: {}", id, tenantId);
+
+        loadRoleAndVerifyTenant(id, tenantId);
 
         // Delete role permissions first
         roleMapper.deleteRolePermissionsByRoleId(id);
@@ -146,12 +157,15 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void assignPermissions(Long roleId, AssignPermissionsRequest request) {
-        log.info("Assigning permissions to role: {}", roleId);
+        assignPermissions(roleId, request, SecurityUtils.getCurrentTenantId());
+    }
 
-        Role role = roleMapper.findById(roleId);
-        if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void assignPermissions(Long roleId, AssignPermissionsRequest request, Long tenantId) {
+        log.info("Assigning permissions to role: {} in tenant: {}", roleId, tenantId);
+
+        loadRoleAndVerifyTenant(roleId, tenantId);
 
         // Delete existing permission assignments
         roleMapper.deleteRolePermissionsByRoleId(roleId);
@@ -159,15 +173,28 @@ public class RoleServiceImpl implements RoleService {
         // Create new permission assignments
         for (Long permissionId : request.getPermissionIds()) {
             Permission permission = permissionMapper.findById(permissionId);
-            if (permission == null) {
+            // 校验权限存在且属于同一租户（防止跨租户分配权限）
+            if (permission == null || (tenantId != null && !tenantId.equals(permission.getTenantId()))) {
                 throw new BusinessException(ErrorCode.PERMISSION_NOT_FOUND);
             }
 
-            // Create RolePermission relationship
-            roleMapper.insertRolePermission(roleId, permissionId, role.getTenantId());
+            // Create RolePermission relationship（统一使用调用方租户）
+            roleMapper.insertRolePermission(roleId, permissionId, tenantId);
         }
 
         log.info("Permissions assigned successfully to role: {}", roleId);
+    }
+
+    /**
+     * 加载角色并校验租户归属
+     * 角色不存在或不属于指定租户时抛 ROLE_NOT_FOUND（不泄露存在性）
+     */
+    private Role loadRoleAndVerifyTenant(Long roleId, Long tenantId) {
+        Role role = roleMapper.findById(roleId);
+        if (role == null || (tenantId != null && !tenantId.equals(role.getTenantId()))) {
+            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
+        }
+        return role;
     }
 
     /**

@@ -39,10 +39,12 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public PermissionResponse getPermissionById(Long id) {
-        Permission permission = permissionMapper.findById(id);
-        if (permission == null) {
-            throw new BusinessException(ErrorCode.PERMISSION_NOT_FOUND);
-        }
+        return getPermissionById(id, SecurityUtils.getCurrentTenantId());
+    }
+
+    @Override
+    public PermissionResponse getPermissionById(Long id, Long tenantId) {
+        Permission permission = loadPermissionAndVerifyTenant(id, tenantId);
         return mapToPermissionResponse(permission);
     }
 
@@ -79,12 +81,15 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void deletePermission(Long id) {
-        log.info("Deleting permission: {}", id);
+        deletePermission(id, SecurityUtils.getCurrentTenantId());
+    }
 
-        Permission permission = permissionMapper.findById(id);
-        if (permission == null) {
-            throw new BusinessException(ErrorCode.PERMISSION_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void deletePermission(Long id, Long tenantId) {
+        log.info("Deleting permission: {} in tenant: {}", id, tenantId);
+
+        loadPermissionAndVerifyTenant(id, tenantId);
 
         // Delete role permissions first
         rolePermissionMapper.deleteByPermissionId(id);
@@ -93,6 +98,18 @@ public class PermissionServiceImpl implements PermissionService {
         permissionMapper.deleteById(id);
 
         log.info("Permission deleted successfully: {}", id);
+    }
+
+    /**
+     * 加载权限并校验租户归属
+     * 权限不存在或不属于指定租户时抛 PERMISSION_NOT_FOUND（不泄露存在性）
+     */
+    private Permission loadPermissionAndVerifyTenant(Long permissionId, Long tenantId) {
+        Permission permission = permissionMapper.findById(permissionId);
+        if (permission == null || (tenantId != null && !tenantId.equals(permission.getTenantId()))) {
+            throw new BusinessException(ErrorCode.PERMISSION_NOT_FOUND);
+        }
+        return permission;
     }
 
     /**

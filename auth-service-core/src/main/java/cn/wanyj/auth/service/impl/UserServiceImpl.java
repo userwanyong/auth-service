@@ -1,6 +1,7 @@
 package cn.wanyj.auth.service.impl;
 
 import cn.wanyj.auth.security.SecurityUtils;
+import cn.wanyj.auth.util.UserFieldValidator;
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
 import cn.wanyj.auth.dto.request.UpdateUserRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
@@ -106,12 +107,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void assignRoles(Long userId, AssignRolesRequest request) {
-        log.info("Assigning roles to user: {}", userId);
+        assignRoles(userId, SecurityUtils.getCurrentTenantId(), request);
+    }
 
-        User user = userMapper.findById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void assignRoles(Long userId, Long tenantId, AssignRolesRequest request) {
+        log.info("Assigning roles to user: {} in tenant: {}", userId, tenantId);
+
+        loadUserAndVerifyTenant(userId, tenantId);
 
         // Delete existing role assignments
         userMapper.deleteUserRolesByUserId(userId);
@@ -119,12 +123,13 @@ public class UserServiceImpl implements UserService {
         // Create new role assignments
         for (Long roleId : request.getRoleIds()) {
             Role role = roleMapper.findById(roleId);
-            if (role == null) {
+            // 校验角色存在且属于同一租户（防止跨租户分配角色）
+            if (role == null || (tenantId != null && !tenantId.equals(role.getTenantId()))) {
                 throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
             }
 
-            // Create UserRole relationship
-            userMapper.insertUserRole(userId, roleId, role.getTenantId());
+            // Create UserRole relationship（统一使用调用方租户）
+            userMapper.insertUserRole(userId, roleId, tenantId);
         }
 
         log.info("Roles assigned successfully to user: {}", userId);
@@ -133,12 +138,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateUserStatus(Long userId, Integer status) {
-        log.info("Updating status for user: {} to {}", userId, status);
+        updateUserStatus(userId, SecurityUtils.getCurrentTenantId(), status);
+    }
 
-        User user = userMapper.findById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void updateUserStatus(Long userId, Long tenantId, Integer status) {
+        log.info("Updating status for user: {} to {} in tenant: {}", userId, status, tenantId);
+
+        User user = loadUserAndVerifyTenant(userId, tenantId);
 
         user.setStatus(status);
         user.setUpdatedAt(LocalDateTime.now());
@@ -159,6 +167,9 @@ public class UserServiceImpl implements UserService {
     public void updateUser(Long userId, Long tenantId, UpdateUserRequest request) {
         log.info("Updating user profile: {} in tenant: {}", userId, tenantId);
 
+        // Validate contact field formats (email/phone) if provided
+        UserFieldValidator.validateContactFields(request.getEmail(), request.getPhone());
+
         User user = userMapper.findById(userId);
         if (user == null || (tenantId != null && !tenantId.equals(user.getTenantId()))) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -172,22 +183,26 @@ public class UserServiceImpl implements UserService {
             user.setUsername(username);
         }
 
-        String email = request.getEmail() != null ? request.getEmail().trim() : null;
-        if (email != null && email.isEmpty()) {
-            email = null;
+        // email: null=不改，空串=清空，非空=更新（含租户内唯一性校验）
+        if (request.getEmail() != null) {
+            String email = request.getEmail().trim();
+            email = email.isEmpty() ? null : email;
+            if (email != null && !email.equals(user.getEmail()) && tenantId != null && userMapper.existsByEmail(email, tenantId)) {
+                throw new BusinessException(ErrorCode.EMAIL_EXISTS);
+            }
+            user.setEmail(email);
         }
-        if (email != null && !email.equals(user.getEmail()) && tenantId != null && userMapper.existsByEmail(email, tenantId)) {
-            throw new BusinessException(ErrorCode.EMAIL_EXISTS);
-        }
-        user.setEmail(email);
 
         if (request.getPhone() != null) {
             String phone = request.getPhone().trim();
             user.setPhone(phone.isEmpty() ? null : phone);
         }
 
-        String nickname = request.getNickname() != null ? request.getNickname().trim() : null;
-        user.setNickname((nickname != null && nickname.isEmpty()) ? null : nickname);
+        // nickname: null=不改，空串=清空，非空=更新
+        if (request.getNickname() != null) {
+            String nickname = request.getNickname().trim();
+            user.setNickname(nickname.isEmpty() ? null : nickname);
+        }
 
         if (request.getAvatar() != null) {
             String avatar = request.getAvatar().trim();
@@ -210,12 +225,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteUser(Long userId) {
-        log.info("Deleting user: {}", userId);
+        deleteUser(userId, SecurityUtils.getCurrentTenantId());
+    }
 
-        User user = userMapper.findById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
+    @Override
+    @Transactional
+    public void deleteUser(Long userId, Long tenantId) {
+        log.info("Deleting user: {} in tenant: {}", userId, tenantId);
+
+        loadUserAndVerifyTenant(userId, tenantId);
 
         // Delete user roles first
         userMapper.deleteUserRolesByUserId(userId);
@@ -224,6 +242,18 @@ public class UserServiceImpl implements UserService {
         userMapper.deleteById(userId);
 
         log.info("User deleted successfully: {}", userId);
+    }
+
+    /**
+     * 加载用户并校验租户归属
+     * 用户不存在或不属于指定租户时抛 USER_NOT_FOUND（不泄露资源存在性）
+     */
+    private User loadUserAndVerifyTenant(Long userId, Long tenantId) {
+        User user = userMapper.findById(userId);
+        if (user == null || (tenantId != null && !tenantId.equals(user.getTenantId()))) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        return user;
     }
 
     /**

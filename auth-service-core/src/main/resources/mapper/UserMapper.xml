@@ -213,8 +213,7 @@
     <!-- Update -->
     <update id="update" parameterType="cn.wanyj.auth.entity.User">
         UPDATE user
-        SET tenant_id = #{tenantId},
-            username = #{username},
+        SET username = #{username},
             password = #{password},
             email = #{email},
             phone = #{phone},

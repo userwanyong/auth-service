@@ -35,33 +35,22 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
     public OperationResult updateUser(UpdateUserRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
         Long tenantId = Long.parseLong(request.getTenantId());
-        log.info("RPC updateUser: userId={}, tenantId={}", userId, tenantId);
+        log.info("RPC updateUser: userId={}, tenantId={}, fields={}", userId, tenantId, request.getFieldsToUpdateList());
         try {
             UpdateUserRequest updateUserRequest = new UpdateUserRequest();
-            if (!request.getUsername().isBlank()) {
-                updateUserRequest.setUsername(request.getUsername());
-            }
-            if (!request.getPassword().isBlank()) {
-                updateUserRequest.setPassword(request.getPassword());
-            }
-            if (!request.getEmail().isBlank()) {
-                updateUserRequest.setEmail(request.getEmail());
-            } else {
-                updateUserRequest.setEmail("");
-            }
-            if (!request.getPhone().isBlank()) {
-                updateUserRequest.setPhone(request.getPhone());
-            }
-            if (!request.getNickname().isBlank()) {
-                updateUserRequest.setNickname(request.getNickname());
-            } else {
-                updateUserRequest.setNickname("");
-            }
-            if (!request.getAvatar().isBlank()) {
-                updateUserRequest.setAvatar(request.getAvatar());
-            }
-            if (request.getStatus() != 0) {
-                updateUserRequest.setStatus(request.getStatus());
+            // 基于 fields_to_update 字段掩码设置待更新字段
+            // 仅出现在掩码中的字段才更新（含 status=0 禁用、空字符串清空），其余保持 null（不改）
+            for (String field : request.getFieldsToUpdateList()) {
+                switch (field) {
+                    case "username" -> updateUserRequest.setUsername(request.getUsername());
+                    case "password" -> updateUserRequest.setPassword(request.getPassword());
+                    case "email" -> updateUserRequest.setEmail(request.getEmail());
+                    case "phone" -> updateUserRequest.setPhone(request.getPhone());
+                    case "nickname" -> updateUserRequest.setNickname(request.getNickname());
+                    case "avatar" -> updateUserRequest.setAvatar(request.getAvatar());
+                    case "status" -> updateUserRequest.setStatus(request.getStatus());
+                    default -> log.warn("Unknown field in fields_to_update: {}", field);
+                }
             }
 
             userService.updateUser(userId, tenantId, updateUserRequest);
@@ -99,7 +88,7 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
                     .build();
             }
 
-            userService.updateUserStatus(userId, request.getStatus());
+            userService.updateUserStatus(userId, tenantId, request.getStatus());
 
             return OperationResult.newBuilder()
                 .setSuccess(true)
@@ -132,7 +121,7 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
                     .collect(Collectors.toList()))
                 .build();
 
-            userService.assignRoles(userId, assignRolesRequest);
+            userService.assignRoles(userId, tenantId, assignRolesRequest);
 
             return OperationResult.newBuilder()
                 .setSuccess(true)
@@ -159,7 +148,7 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
         Long tenantId = Long.parseLong(request.getTenantId());
         log.info("RPC deleteUser: userId={}, tenantId={}", userId, tenantId);
         try {
-            userService.deleteUser(userId);
+            userService.deleteUser(userId, tenantId);
 
             return OperationResult.newBuilder()
                 .setSuccess(true)
