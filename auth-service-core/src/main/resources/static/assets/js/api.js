@@ -167,7 +167,21 @@ const API = (function() {
          * PUT /api/auth/password
          */
         changePassword: (oldPassword, newPassword) =>
-            put('/auth/password', { oldPassword, newPassword })
+            put('/auth/password', { oldPassword, newPassword }),
+
+        /**
+         * 发送验证码（邮箱/手机）
+         * POST /api/auth/send-code
+         */
+        sendCode: (tenantUid, method, target) =>
+            postJson('/auth/send-code', { tenantUid, method, target }),
+
+        /**
+         * 验证码登录（邮箱/手机）
+         * POST /api/auth/login-by-code
+         */
+        loginByCode: (tenantUid, method, target, code) =>
+            postJson('/auth/login-by-code', { tenantUid, method, target, code })
     };
 
     // ========== Users API ==========

@@ -18,22 +18,6 @@
             <!-- Login Form -->
             <form class="login-form" id="loginForm">
                 <div class="form-group">
-                    <label for="loginUsername">用户名</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">👤</span>
-                        <input type="text" id="loginUsername" name="username" class="form-control with-icon" required
-                               placeholder="请输入用户名" autocomplete="username">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">密码</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">🔒</span>
-                        <input type="password" id="loginPassword" name="password" class="form-control with-icon" required
-                               placeholder="请输入密码" autocomplete="current-password">
-                    </div>
-                </div>
-                <div class="form-group">
                     <label for="loginTenantId">租户</label>
                     <div class="input-wrapper">
                         <span class="input-icon">🏢</span>
@@ -41,8 +25,71 @@
                             <option value="">请选择租户</option>
                         </select>
                     </div>
-                    <small class="form-text">请选择要登录的租户</small>
                 </div>
+
+                <!-- 登录方式 Tab（按租户可用方式动态显示） -->
+                <div class="login-tabs" id="loginTabs"></div>
+
+                <!-- 账号密码 -->
+                <div class="login-pane" id="pane-password" data-method="password">
+                    <div class="form-group">
+                        <label for="loginUsername">用户名</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">👤</span>
+                            <input type="text" id="loginUsername" class="form-control with-icon"
+                                   placeholder="请输入用户名" autocomplete="username">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">密码</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <input type="password" id="loginPassword" class="form-control with-icon"
+                                   placeholder="请输入密码" autocomplete="current-password">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 邮箱验证码 -->
+                <div class="login-pane" id="pane-email" data-method="email:aliyun" style="display:none;">
+                    <div class="form-group">
+                        <label for="emailInput">邮箱</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">✉️</span>
+                            <input type="email" id="emailInput" class="form-control with-icon"
+                                   placeholder="请输入邮箱" autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="emailCode">验证码</label>
+                        <div class="code-row">
+                            <input type="text" id="emailCode" class="form-control" placeholder="6 位验证码"
+                                   maxlength="6" inputmode="numeric">
+                            <button type="button" class="btn btn-code" id="sendEmailCodeBtn">获取验证码</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 手机验证码 -->
+                <div class="login-pane" id="pane-sms" data-method="sms:aliyun" style="display:none;">
+                    <div class="form-group">
+                        <label for="phoneInput">手机号</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">📱</span>
+                            <input type="tel" id="phoneInput" class="form-control with-icon"
+                                   placeholder="请输入手机号" autocomplete="tel">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="phoneCode">验证码</label>
+                        <div class="code-row">
+                            <input type="text" id="phoneCode" class="form-control" placeholder="6 位验证码"
+                                   maxlength="6" inputmode="numeric">
+                            <button type="button" class="btn btn-code" id="sendPhoneCodeBtn">获取验证码</button>
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-block">登录</button>
             </form>
 

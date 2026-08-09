@@ -1,8 +1,10 @@
 package cn.wanyj.auth.controller;
 
 import cn.wanyj.auth.dto.request.ChangePasswordRequest;
+import cn.wanyj.auth.dto.request.LoginByCodeRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
 import cn.wanyj.auth.dto.request.RegisterRequest;
+import cn.wanyj.auth.dto.request.SendCodeRequest;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.ApiResponse;
@@ -51,6 +53,28 @@ public class AuthController {
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         log.info("Login request for username: {}", request.getUsername());
         TokenResponse token = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success(200, "登录成功", token));
+    }
+
+    /**
+     * 发送验证码（邮箱/手机）
+     * POST /api/auth/send-code
+     */
+    @PostMapping("/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendCode(@Valid @RequestBody SendCodeRequest request) {
+        log.info("Send code request: method={}", request.getMethod());
+        authService.sendCode(request);
+        return ResponseEntity.ok(ApiResponse.success(200, "验证码已发送", null));
+    }
+
+    /**
+     * 验证码登录（邮箱/手机）
+     * POST /api/auth/login-by-code
+     */
+    @PostMapping("/login-by-code")
+    public ResponseEntity<ApiResponse<TokenResponse>> loginByCode(@Valid @RequestBody LoginByCodeRequest request) {
+        log.info("Login by code: method={}", request.getMethod());
+        TokenResponse token = authService.loginByCode(request);
         return ResponseEntity.ok(ApiResponse.success(200, "登录成功", token));
     }
 

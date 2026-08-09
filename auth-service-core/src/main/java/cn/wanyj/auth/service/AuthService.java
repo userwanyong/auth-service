@@ -1,8 +1,10 @@
 package cn.wanyj.auth.service;
 
 import cn.wanyj.auth.dto.request.ChangePasswordRequest;
+import cn.wanyj.auth.dto.request.LoginByCodeRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
 import cn.wanyj.auth.dto.request.RegisterRequest;
+import cn.wanyj.auth.dto.request.SendCodeRequest;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 
@@ -23,6 +25,16 @@ public interface AuthService {
      * 用户登录
      */
     TokenResponse login(LoginRequest request);
+
+    /**
+     * 发送验证码（邮箱/手机验证码登录）
+     */
+    void sendCode(SendCodeRequest request);
+
+    /**
+     * 验证码登录（邮箱/手机验证码登录）
+     */
+    TokenResponse loginByCode(LoginByCodeRequest request);
 
     /**
      * Refresh access token

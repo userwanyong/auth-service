@@ -1,46 +1,41 @@
 /**
  * Login Page Module
- * Handles login functionality
+ * 支持账号密码 / 邮箱验证码 / 手机验证码 多方式登录（按租户可用方式动态渲染）
  */
 
 (function() {
     'use strict';
 
-    /**
-     * Initialize login page
-     */
+    let activeMethod = 'password';        // 当前选中的登录方式
+    let enabledMethods = ['password'];    // 当前租户对用户开放的方式
+
+    // 登录方式 → Tab/Pane 定义
+    const TAB_DEFS = [
+        { method: 'password', label: '账号密码', pane: 'pane-password' },
+        { method: 'email:aliyun', label: '邮箱', pane: 'pane-email' },
+        { method: 'sms:aliyun', label: '手机', pane: 'pane-sms' }
+    ];
+
     function init() {
-        // Check if already authenticated
         if (Auth.isAuthenticated()) {
             window.location.href = '/';
             return;
         }
-
-        // Setup login form
         setupLoginForm();
-
-        // Load available tenants (public endpoint, no auth required)
+        setupCodeButtons();
         loadTenants();
     }
 
     /**
-     * Setup login form
+     * 提交登录：按当前 active 方式路由到对应 API
      */
     function setupLoginForm() {
         const form = document.getElementById('loginForm');
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            const tenantUidValue = document.getElementById('loginTenantId').value;
-
-            console.log('Login form values:', { username, passwordLength: password?.length, tenantUidValue });
-
-            // Check if tenantUidValue is empty (not falsy, since 0 is a valid ID)
-            if (!username || !password || tenantUidValue === '') {
-                Toast.error('请填写所有必填项');
+            const tenantUid = document.getElementById('loginTenantId').value;
+            if (!tenantUid) {
+                Toast.error('请选择租户');
                 return;
             }
 
@@ -50,22 +45,38 @@
             submitBtn.textContent = '登录中...';
 
             try {
-                const tokenResponse = await API.Auth.login(username, password, tenantUidValue);
+                let tokenResponse;
+                if (activeMethod === 'password') {
+                    const username = document.getElementById('loginUsername').value.trim();
+                    const password = document.getElementById('loginPassword').value;
+                    if (!username || !password) {
+                        Toast.error('请输入用户名和密码');
+                        return;
+                    }
+                    tokenResponse = await API.Auth.login(username, password, tenantUid);
+                } else {
+                    const category = activeMethod.split(':')[0];
+                    const target = category === 'email'
+                        ? document.getElementById('emailInput').value.trim()
+                        : document.getElementById('phoneInput').value.trim();
+                    const code = category === 'email'
+                        ? document.getElementById('emailCode').value.trim()
+                        : document.getElementById('phoneCode').value.trim();
+                    if (!target || !code) {
+                        Toast.error('请输入' + (category === 'email' ? '邮箱' : '手机号') + '和验证码');
+                        return;
+                    }
+                    tokenResponse = await API.Auth.loginByCode(tenantUid, activeMethod, target, code);
+                }
 
-                // Save token first (needed for subsequent API calls)
-                // User info will be fetched on the dashboard
                 localStorage.setItem('auth_access_token', tokenResponse.accessToken);
                 localStorage.setItem('auth_refresh_token', tokenResponse.refreshToken);
 
                 Toast.success('登录成功！');
-
-                // Redirect to dashboard (will fetch user info there)
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 500);
+                setTimeout(() => { window.location.href = '/'; }, 500);
             } catch (error) {
                 console.error('Login error:', error);
-                Toast.error('登录失败: ' + (error.message || '用户名或密码错误'));
+                Toast.error('登录失败: ' + (error.message || '请重试'));
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
@@ -74,83 +85,162 @@
     }
 
     /**
-     * Load available tenants from API
-     * This is a public endpoint that doesn't require authentication
+     * 绑定邮箱/手机「获取验证码」按钮
+     */
+    function setupCodeButtons() {
+        const emailBtn = document.getElementById('sendEmailCodeBtn');
+        const phoneBtn = document.getElementById('sendPhoneCodeBtn');
+        if (emailBtn) {
+            emailBtn.addEventListener('click', () => {
+                sendCode('email:aliyun', document.getElementById('emailInput').value.trim(), 'sendEmailCodeBtn');
+            });
+        }
+        if (phoneBtn) {
+            phoneBtn.addEventListener('click', () => {
+                sendCode('sms:aliyun', document.getElementById('phoneInput').value.trim(), 'sendPhoneCodeBtn');
+            });
+        }
+    }
+
+    async function sendCode(method, target, btnId) {
+        const tenantUid = document.getElementById('loginTenantId').value;
+        if (!tenantUid) {
+            Toast.error('请先选择租户');
+            return;
+        }
+        if (!target) {
+            Toast.error(method.startsWith('email') ? '请输入邮箱' : '请输入手机号');
+            return;
+        }
+        const btn = document.getElementById(btnId);
+        try {
+            btn.disabled = true;
+            await API.Auth.sendCode(tenantUid, method, target);
+            Toast.success('验证码已发送');
+            countdown(btn, 60);
+        } catch (error) {
+            Toast.error('发送失败: ' + (error.message || '请重试'));
+            btn.disabled = false;
+        }
+    }
+
+    function countdown(btn, seconds) {
+        let left = seconds;
+        const original = btn.dataset.originalText || btn.textContent;
+        btn.dataset.originalText = original;
+        btn.textContent = left + 's 后重发';
+        const timer = setInterval(() => {
+            left--;
+            if (left <= 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.textContent = original;
+            } else {
+                btn.textContent = left + 's 后重发';
+            }
+        }, 1000);
+    }
+
+    /**
+     * 加载可用租户，并在切换租户时刷新该租户可用的登录方式
      */
     async function loadTenants() {
         const loginTenantSelect = document.getElementById('loginTenantId');
-
         if (!loginTenantSelect) return;
 
         try {
             const tenants = await API.Tenants.getAvailable();
-            console.log('Loaded tenants:', tenants);
-
-            // 清空原有选项，下拉只放真实租户（不再保留"请选择租户"占位项）
             loginTenantSelect.innerHTML = '';
-
-            // Populate with fetched tenants
             tenants.forEach(tenant => {
                 const option = `<option value="${tenant.tenantUid}">${escapeHtml(tenant.tenantName)} (${escapeHtml(tenant.tenantCode)})</option>`;
                 loginTenantSelect.insertAdjacentHTML('beforeend', option);
             });
         } catch (error) {
             console.error('Failed to load tenants:', error);
-            // Fallback to default tenant if API fails
-            const fallbackOption = '<option value="1">默认租户</option>';
-            loginTenantSelect.insertAdjacentHTML('beforeend', fallbackOption);
+            loginTenantSelect.insertAdjacentHTML('beforeend', '<option value="">默认租户</option>');
         }
 
-        // 选租户后加载该租户对用户开放的登录方式（用于动态渲染社交登录入口）
         loginTenantSelect.addEventListener('change', () => {
-            loadEnabledLoginMethods(loginTenantSelect.value);
+            refreshMethods(loginTenantSelect.value);
         });
         if (loginTenantSelect.value) {
-            loadEnabledLoginMethods(loginTenantSelect.value);
+            refreshMethods(loginTenantSelect.value);
+        } else {
+            renderTabs(['password']);
         }
     }
 
     /**
-     * 按租户标识拉取该租户对用户开放的登录方式，渲染社交登录按钮
-     * 阶段0：仅渲染 oauth:* 方式占位（点击提示后续上线）；邮箱/短信完整交互在阶段1
+     * 按租户标识拉取可用登录方式，渲染 Tab 与社交登录入口
      */
-    async function loadEnabledLoginMethods(tenantUid) {
-        const container = document.getElementById('socialLoginMethods');
-        const divider = document.getElementById('loginDivider');
-        if (!container || !divider) return;
+    async function refreshMethods(tenantUid) {
         if (!tenantUid) {
-            divider.style.display = 'none';
-            container.innerHTML = '';
+            enabledMethods = ['password'];
+            renderTabs(enabledMethods);
+            renderSocial([]);
             return;
         }
         try {
             const methods = await API.LoginMethods.getEnabled(tenantUid);
-            const oauthMethods = (methods || []).filter(m => m.startsWith('oauth:'));
-            if (oauthMethods.length) {
-                divider.style.display = '';
-                container.innerHTML = oauthMethods.map(m => {
-                    const name = (m.split(':')[1] || '').toUpperCase();
-                    return `<button type="button" class="btn-social" data-method="${escapeHtml(m)}">${escapeHtml(name)} 登录</button>`;
-                }).join('');
-                container.querySelectorAll('.btn-social').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        Toast.info('该登录方式将在后续阶段上线');
-                    });
+            enabledMethods = (methods && methods.length) ? methods : ['password'];
+        } catch (e) {
+            enabledMethods = ['password'];
+        }
+        renderTabs(enabledMethods);
+        renderSocial(enabledMethods.filter(m => m.startsWith('oauth:')));
+    }
+
+    /**
+     * 渲染登录方式 Tab，并切换到可用方式（active 不可用时回退首个）
+     */
+    function renderTabs(methods) {
+        const tabsEl = document.getElementById('loginTabs');
+        const visible = TAB_DEFS.filter(t => methods.includes(t.method));
+        tabsEl.innerHTML = visible.map(t =>
+            `<button type="button" class="login-tab${t.method === activeMethod ? ' active' : ''}" data-method="${t.method}" data-pane="${t.pane}">${t.label}</button>`
+        ).join('');
+        tabsEl.querySelectorAll('.login-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchPane(tab.dataset.method, tab.dataset.pane));
+        });
+        tabsEl.style.display = visible.length > 1 ? '' : 'none';
+
+        const target = visible.find(t => t.method === activeMethod) || visible[0];
+        if (target) {
+            switchPane(target.method, target.pane);
+        }
+    }
+
+    function switchPane(method, paneId) {
+        activeMethod = method;
+        document.querySelectorAll('.login-pane').forEach(p => p.style.display = 'none');
+        const pane = document.getElementById(paneId);
+        if (pane) pane.style.display = '';
+        document.querySelectorAll('.login-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.method === method);
+        });
+    }
+
+    function renderSocial(oauthMethods) {
+        const container = document.getElementById('socialLoginMethods');
+        const divider = document.getElementById('loginDivider');
+        if (!container || !divider) return;
+        if (oauthMethods && oauthMethods.length) {
+            divider.style.display = '';
+            container.innerHTML = oauthMethods.map(m => {
+                const name = (m.split(':')[1] || '').toUpperCase();
+                return `<button type="button" class="btn-social" data-method="${escapeHtml(m)}">${escapeHtml(name)} 登录</button>`;
+            }).join('');
+            container.querySelectorAll('.btn-social').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    Toast.info('该登录方式将在后续阶段上线');
                 });
-            } else {
-                divider.style.display = 'none';
-                container.innerHTML = '';
-            }
-        } catch (error) {
-            console.error('Failed to load enabled login methods', error);
+            });
+        } else {
             divider.style.display = 'none';
             container.innerHTML = '';
         }
     }
 
-    /**
-     * Escape HTML to prevent XSS
-     */
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -167,12 +257,7 @@
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
 
-            const icons = {
-                success: '✓',
-                error: '✕',
-                warning: '⚠',
-                info: 'ℹ'
-            };
+            const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
 
             toast.innerHTML = `
                 <span class="toast-icon">${icons[type] || icons.info}</span>
@@ -181,14 +266,10 @@
             `;
 
             container.appendChild(toast);
-
-            // Close button
             toast.querySelector('.toast-close').addEventListener('click', () => {
                 toast.classList.add('removing');
                 setTimeout(() => toast.remove(), 300);
             });
-
-            // Auto remove
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.classList.add('removing');
@@ -196,24 +277,14 @@
                 }
             }, 3000);
         },
-        success(message) {
-            this.show(message, 'success');
-        },
-        error(message) {
-            this.show(message, 'error');
-        },
-        warning(message) {
-            this.show(message, 'warning');
-        },
-        info(message) {
-            this.show(message, 'info');
-        }
+        success(message) { this.show(message, 'success'); },
+        error(message) { this.show(message, 'error'); },
+        warning(message) { this.show(message, 'warning'); },
+        info(message) { this.show(message, 'info'); }
     };
 
-    // Expose Toast globally
     window.Toast = Toast;
 
-    // Initialize on DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

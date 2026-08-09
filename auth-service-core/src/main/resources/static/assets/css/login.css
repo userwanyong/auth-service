@@ -343,3 +343,69 @@ select.form-control {
     color: var(--primary-color);
     transform: translateY(-1px);
 }
+
+/* ===================================
+   Login method tabs & code input
+   =================================== */
+.login-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.login-tab {
+    flex: 1;
+    padding: 10px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.login-tab:hover {
+    color: var(--primary-color);
+}
+
+.login-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.code-row {
+    display: flex;
+    gap: 10px;
+}
+
+.code-row .form-control {
+    flex: 1;
+}
+
+.btn-code {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 110px;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background: #ffffff;
+    color: var(--primary-color);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-code:hover:not(:disabled) {
+    border-color: var(--primary-color);
+}
+
+.btn-code:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

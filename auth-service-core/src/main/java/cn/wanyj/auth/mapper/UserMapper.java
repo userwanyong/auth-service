@@ -136,6 +136,24 @@ public interface UserMapper {
     User findByUsernameWithRolesAndPermissions(@Param("username") String username, @Param("tenantId") Long tenantId);
 
     /**
+     * Find user with roles and permissions by email and tenant id
+     * 根据邮箱和租户ID查找用户及其角色和权限信息（邮箱验证码登录用）
+     */
+    User findByEmailWithRolesAndPermissions(@Param("email") String email, @Param("tenantId") Long tenantId);
+
+    /**
+     * Find user with roles and permissions by phone and tenant id
+     * 根据手机号和租户ID查找用户及其角色和权限信息（短信验证码登录用）
+     */
+    User findByPhoneWithRolesAndPermissions(@Param("phone") String phone, @Param("tenantId") Long tenantId);
+
+    /**
+     * Check if phone exists in tenant
+     * 检查手机号在租户内是否存在
+     */
+    boolean existsByPhone(@Param("phone") String phone, @Param("tenantId") Long tenantId);
+
+    /**
      * Insert user role
      * 插入用户角色关联
      */
