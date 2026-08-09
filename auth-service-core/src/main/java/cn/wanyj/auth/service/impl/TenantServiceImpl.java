@@ -324,6 +324,7 @@ public class TenantServiceImpl implements TenantService {
                     .nickname("管理员")
                     .status(1)
                     .emailVerified(false)
+                    .phoneVerified(false)
                     .build();
 
             userMapper.insert(adminUser);
