@@ -259,7 +259,7 @@ public class OAuthLoginService {
                 .nickname((info.getNickname() != null && !info.getNickname().isBlank()) ? info.getNickname() : username)
                 .avatar(info.getAvatar())
                 .status(1)
-                .emailVerified(email != null)
+                .emailVerified(false) // OAuth 第三方不保证邮箱已验证；用户需自行走邮箱验证码流程验证
                 .phoneVerified(false)
                 .roles(new HashSet<>())
                 .build();
