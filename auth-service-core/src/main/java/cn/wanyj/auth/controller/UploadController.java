@@ -31,10 +31,14 @@ public class UploadController {
      */
     @PostMapping("/avatar")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadAvatar(
-            @RequestParam("file") MultipartFile file) {
-        Long userId = SecurityUtils.getCurrentUserId();
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
         Long tenantId = SecurityUtils.getCurrentTenantId();
-        String url = ossService.uploadAvatar(file, tenantId, userId);
+        // 头像归属用户：编辑已有用户时前端传 targetUserId，objectKey 落到该用户路径；
+        // 新建用户（尚无 id）不传，退回用当前操作者，保持兼容
+        Long ownerUserId = targetUserId != null ? targetUserId : currentUserId;
+        String url = ossService.uploadAvatar(file, tenantId, ownerUserId);
         return ResponseEntity.ok(ApiResponse.success(200, "上传成功", Map.of("url", url)));
     }
 }

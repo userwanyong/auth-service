@@ -14,6 +14,7 @@ import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.RoleMapper;
 import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.mapper.UserRoleMapper;
+import cn.wanyj.auth.service.OssService;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class UserServiceImpl implements UserService {
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final OssService ossService;
 
     @Override
     public UserResponse getUserById(Long id) {
@@ -232,9 +234,15 @@ public class UserServiceImpl implements UserService {
             user.setBirthday(request.getBirthday());
         }
 
+        String staleAvatar = null;
         if (request.getAvatar() != null) {
-            String avatar = request.getAvatar().trim();
-            user.setAvatar(avatar.isEmpty() ? null : avatar);
+            String newAvatar = request.getAvatar().trim();
+            newAvatar = newAvatar.isEmpty() ? null : newAvatar;
+            // 头像被替换：记录旧值，DB 更新成功后再清理 OSS 旧对象
+            if (user.getAvatar() != null && !user.getAvatar().equals(newAvatar)) {
+                staleAvatar = user.getAvatar();
+            }
+            user.setAvatar(newAvatar);
         }
 
         if (request.getStatus() != null) {
@@ -247,6 +255,12 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.update(user);
+
+        // DB 更新成功后清理被替换的旧头像（OSS 删除失败不阻断业务，仅记日志）
+        if (staleAvatar != null) {
+            ossService.deleteAvatarByUrl(staleAvatar);
+        }
+
         log.info("User profile updated successfully: {} in tenant: {}", userId, tenantId);
     }
 
@@ -261,13 +275,21 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long userId, Long tenantId) {
         log.info("Deleting user: {} in tenant: {}", userId, tenantId);
 
-        loadUserAndVerifyTenant(userId, tenantId);
+        User user = loadUserAndVerifyTenant(userId, tenantId);
+        // 头像 objectKey 由上传者（操作人）决定，未必落在该用户前缀下，
+        // 因此按 DB 中实际存储的头像 URL 删除，而不是按用户前缀猜测
+        String avatarUrl = user.getAvatar();
 
         // Delete user roles first
         userMapper.deleteUserRolesByUserId(userId);
 
         // Delete user
         userMapper.deleteById(userId);
+
+        // DB 删除成功后，清理该用户的头像 OSS 对象（失败不阻断业务，仅记日志）
+        if (avatarUrl != null && !avatarUrl.isBlank()) {
+            ossService.deleteAvatarByUrl(avatarUrl);
+        }
 
         log.info("User deleted successfully: {}", userId);
     }

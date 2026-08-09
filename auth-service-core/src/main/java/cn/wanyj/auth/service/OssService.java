@@ -35,6 +35,9 @@ public class OssService {
 
     /**
      * 上传头像到 OSS，返回可访问 URL。
+     *
+     * @param userId 头像归属用户 ID（由调用方决定：编辑场景传目标用户，新建场景传操作者），
+     *               objectKey 按此 id 隔离到 {prefix}/{tenantId}/{userId}/
      */
     public String uploadAvatar(MultipartFile file, Long tenantId, Long userId) {
         OSS oss = ossProvider.getIfAvailable();
@@ -66,6 +69,60 @@ public class OssService {
     private String publicUrl(String objectKey) {
         String host = props.getEndpoint().replaceFirst("^https?://", "");
         return "https://" + props.getBucket() + "." + host + "/" + objectKey;
+    }
+
+    /**
+     * 删除指定头像 URL 对应的 OSS 对象（用于头像被替换时清理旧图）。
+     * <p>仅当 URL 属于本系统 bucket 且位于头像前缀下时才删除，避免误删外部图床或越权删除。
+     * OSS 未配置或删除失败时静默（仅记日志），不抛异常，不阻断业务流程。</p>
+     *
+     * @param url 旧头像的完整访问 URL，可为 null
+     */
+    public void deleteAvatarByUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        String objectKey = resolveOwnObjectKey(url);
+        if (objectKey == null) {
+            return;
+        }
+        deleteObjectQuietly(objectKey);
+    }
+
+    /**
+     * 解析本系统头像 URL 为 OSS objectKey。
+     * <p>URL 必须以本 bucket 的公开访问前缀开头，且 objectKey 位于头像前缀下；
+     * 否则返回 null（非本系统资源，不删除）。</p>
+     */
+    private String resolveOwnObjectKey(String url) {
+        if (props.getEndpoint() == null || props.getEndpoint().isBlank()
+                || props.getBucket() == null || props.getBucket().isBlank()) {
+            return null;
+        }
+        String host = props.getEndpoint().replaceFirst("^https?://", "");
+        String urlPrefix = "https://" + props.getBucket() + "." + host + "/";
+        if (!url.startsWith(urlPrefix)) {
+            return null;
+        }
+        String objectKey = url.substring(urlPrefix.length());
+        if (!objectKey.startsWith(props.getObjectPrefix() + "/")) {
+            return null;
+        }
+        return objectKey;
+    }
+
+    /** 安静删除单个 OSS 对象（失败仅记日志，不抛异常） */
+    private void deleteObjectQuietly(String objectKey) {
+        OSS oss = ossProvider.getIfAvailable();
+        if (oss == null || props.getEndpoint() == null || props.getEndpoint().isBlank()) {
+            return;
+        }
+        try {
+            oss.deleteObject(props.getBucket(), objectKey);
+            log.info("OSS object deleted: {}", objectKey);
+        } catch (Exception e) {
+            log.warn("Failed to delete OSS object {}: {}", objectKey, e.getMessage());
+        }
     }
 
     private void validate(MultipartFile file) {

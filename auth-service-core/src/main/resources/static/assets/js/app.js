@@ -413,8 +413,10 @@
         document.getElementById('userAvatarFile').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            // 编辑已有用户时带上 targetUserId，让头像落到该用户的 OSS 路径；新建时不带
+            const targetUserId = document.getElementById('userId').value || null;
             try {
-                const result = await API.Upload.avatar(file);
+                const result = await API.Upload.avatar(file, targetUserId);
                 document.getElementById('userAvatar').value = result.url;
                 const preview = document.getElementById('userAvatarPreview');
                 preview.src = result.url;

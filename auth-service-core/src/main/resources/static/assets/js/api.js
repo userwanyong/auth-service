@@ -385,10 +385,11 @@ const API = (function() {
          * Upload avatar (multipart/form-data)
          * POST /api/upload/avatar → { url }
          */
-        avatar: (file) => {
+        avatar: (file, targetUserId) => {
             const formData = new FormData();
             formData.append('file', file);
-            return postForm('/upload/avatar', formData);
+            const query = targetUserId ? '?targetUserId=' + encodeURIComponent(targetUserId) : '';
+            return postForm('/upload/avatar' + query, formData);
         }
     };
 
