@@ -86,8 +86,8 @@
             const tenants = await API.Tenants.getAvailable();
             console.log('Loaded tenants:', tenants);
 
-            // Clear existing options (keep the first "请选择租户" option)
-            loginTenantSelect.innerHTML = '<option value="">请选择租户</option>';
+            // 清空原有选项，下拉只放真实租户（不再保留"请选择租户"占位项）
+            loginTenantSelect.innerHTML = '';
 
             // Populate with fetched tenants
             tenants.forEach(tenant => {

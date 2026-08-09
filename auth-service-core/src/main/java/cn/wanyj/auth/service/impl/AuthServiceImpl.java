@@ -341,7 +341,16 @@ public class AuthServiceImpl implements AuthService {
                      ? user.getRoles().stream().mapToInt(r -> r.getPermissions() != null ? r.getPermissions().size() : 0).sum()
                      : 0);
 
-        return mapToUserResponse(user);
+        UserResponse response = mapToUserResponse(user);
+        // 附带租户名称供前端展示（左侧不再暴露数字 tenantId）
+        if (tenantId != null) {
+            Tenant tenant = tenantService.getTenantById(tenantId);
+            if (tenant != null) {
+                response.setTenantName(tenant.getTenantName());
+                response.setTenantUid(tenant.getTenantUid());
+            }
+        }
+        return response;
     }
 
     @Override

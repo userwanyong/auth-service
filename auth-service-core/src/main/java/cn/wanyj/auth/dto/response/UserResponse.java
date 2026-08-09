@@ -22,6 +22,10 @@ public class UserResponse {
 
     private Long id;
     private Long tenantId;
+    /** 租户名称（仅当前用户信息接口填充，用于前端展示） */
+    private String tenantName;
+    /** 对外租户标识（仅当前用户信息接口填充，用于对接外部系统） */
+    private String tenantUid;
     private String username;
     private String email;
     private String phone;

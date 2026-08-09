@@ -95,8 +95,10 @@
         document.getElementById('userAvatar').textContent = Auth.getUserAvatar();
         document.getElementById('userName').textContent = user.username || '-';
 
-        // Display tenant info more user-friendly
-        const tenantDisplay = isPlatformTenantId(user.tenantId) ? '平台租户' : `租户ID: ${user.tenantId}`;
+        // 显示对外租户标识（供租户对接外部系统使用）；不再暴露数字 tenantId
+        const tenantDisplay = isPlatformTenantId(user.tenantId)
+            ? '平台租户'
+            : `租户标识: ${user.tenantUid || user.tenantName || user.tenantId}`;
         document.getElementById('userTenant').textContent = tenantDisplay;
 
         // Header role badge（显示角色名称）
