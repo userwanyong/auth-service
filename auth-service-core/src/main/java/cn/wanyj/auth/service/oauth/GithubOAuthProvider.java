@@ -47,7 +47,7 @@ public class GithubOAuthProvider implements OAuthProvider {
 
     @Override
     public String buildAuthorizeUrl(Map<String, String> config, String redirectUri, String state) {
-        String scope = config.getOrDefault("scope", "read:user");
+        String scope = "read:user";
         return AUTHORIZE_URL
                 + "?client_id=" + enc(config.get("clientId"))
                 + "&redirect_uri=" + enc(redirectUri)

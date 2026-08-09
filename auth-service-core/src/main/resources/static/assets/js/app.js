@@ -1186,21 +1186,18 @@
         'oauth:gitee': [
             { key: 'clientId', label: 'Client ID', type: 'text', required: true },
             { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
-            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/gitee/callback' },
-            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'user_info', default: 'user_info' }
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://localhost:8123/api/auth/oauth/gitee/callback' }
         ],
         'oauth:microsoft': [
             { key: 'clientId', label: '应用(客户端) ID', type: 'text', required: true },
             { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
-            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/microsoft/callback' },
-            { key: 'tenant', label: '租户 tenant', type: 'text', required: false, placeholder: 'common 或你的租户ID', default: 'common' },
-            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'openid profile email', default: 'openid profile email' }
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://localhost:8123/api/auth/oauth/microsoft/callback' },
+            { key: 'tenant', label: '租户 tenant', type: 'text', required: false, placeholder: 'common 或你的租户ID', default: 'common' }
         ],
         'oauth:github': [
             { key: 'clientId', label: 'Client ID', type: 'text', required: true },
             { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
-            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/github/callback' },
-            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'read:user', default: 'read:user' }
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://localhost:8123/api/auth/oauth/github/callback' }
         ]
     };
 

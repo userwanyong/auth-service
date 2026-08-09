@@ -42,7 +42,7 @@ public class GiteeOAuthProvider implements OAuthProvider {
 
     @Override
     public String buildAuthorizeUrl(Map<String, String> config, String redirectUri, String state) {
-        String scope = config.getOrDefault("scope", "user_info");
+        String scope = "user_info";
         return AUTHORIZE_URL
                 + "?client_id=" + enc(config.get("clientId"))
                 + "&redirect_uri=" + enc(redirectUri)

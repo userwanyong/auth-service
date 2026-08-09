@@ -47,7 +47,7 @@ public class MicrosoftOAuthProvider implements OAuthProvider {
     @Override
     public String buildAuthorizeUrl(Map<String, String> config, String redirectUri, String state) {
         String tenant = config.getOrDefault("tenant", "common");
-        String scope = config.getOrDefault("scope", "openid profile email");
+        String scope = "openid profile email";
         return authorizeUrl(tenant)
                 + "?client_id=" + enc(config.get("clientId"))
                 + "&redirect_uri=" + enc(redirectUri)
@@ -60,7 +60,7 @@ public class MicrosoftOAuthProvider implements OAuthProvider {
     @Override
     public String exchangeAccessToken(String code, Map<String, String> config, String redirectUri) {
         String tenant = config.getOrDefault("tenant", "common");
-        String scope = config.getOrDefault("scope", "openid profile email");
+        String scope = "openid profile email";
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("code", code);

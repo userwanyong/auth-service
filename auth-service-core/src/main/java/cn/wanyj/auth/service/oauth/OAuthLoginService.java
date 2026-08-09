@@ -73,11 +73,17 @@ public class OAuthLoginService {
         Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenant.getId(), method));
         String redirectUri = cfg.get("redirectUri");
         if (redirectUri == null || redirectUri.isBlank()) {
-            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri");
+            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri（回调地址）");
         }
         OAuthProvider p = findProvider(provider);
         String state = UUID.randomUUID().toString().replace("-", "");
-        redisTemplate.opsForValue().set(STATE_PREFIX + state, tenantUid + ":" + provider,
+        String stateValue;
+        try {
+            stateValue = objectMapper.writeValueAsString(Map.of("t", tenantUid, "p", provider));
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OAuth state 序列化失败");
+        }
+        redisTemplate.opsForValue().set(STATE_PREFIX + state, stateValue,
                 STATE_TTL_SECONDS, TimeUnit.SECONDS);
         return p.buildAuthorizeUrl(cfg, redirectUri, state);
     }
@@ -93,11 +99,16 @@ public class OAuthLoginService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "OAuth state 无效或已过期");
         }
         redisTemplate.delete(STATE_PREFIX + state);
-        String[] parts = raw.toString().split(":", 2);
-        if (parts.length < 2 || !provider.equals(parts[1])) {
+        Map<String, String> sv;
+        try {
+            sv = objectMapper.readValue(raw.toString(), new TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "OAuth state 无效");
+        }
+        if (!provider.equals(sv.get("p"))) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "OAuth state 不匹配");
         }
-        String tenantUid = parts[0];
+        String tenantUid = sv.get("t");
         String method = "oauth:" + provider;
 
         Tenant tenant = tenantService.getTenantByUid(tenantUid);
@@ -111,6 +122,9 @@ public class OAuthLoginService {
 
         Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenantId, method));
         String redirectUri = cfg.get("redirectUri");
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri（回调地址）");
+        }
         OAuthProvider p = findProvider(provider);
 
         // 2. 换 token + 拉用户
