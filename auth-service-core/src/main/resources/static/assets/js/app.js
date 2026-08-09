@@ -1167,6 +1167,43 @@
     // 'platform' = 平台租户看到的平台级总开关/默认凭证；'tenant' = 普通租户看到的本租户开关/凭证来源
     let loginMethodsScope = 'tenant';
 
+    // 各登录方式的凭证字段定义（用于生成结构化表单，避免操作员手写 JSON）
+    const CREDENTIAL_FIELDS = {
+        'email:aliyun': [
+            { key: 'accessKeyId', label: 'AccessKey ID', type: 'text', required: true, placeholder: 'LTAI...' },
+            { key: 'accessKeySecret', label: 'AccessKey Secret', type: 'password', required: true },
+            { key: 'accountName', label: '发信地址 accountName', type: 'text', required: true, placeholder: 'noreply@你的发信域名' },
+            { key: 'fromAlias', label: '发件人别名', type: 'text', required: false, placeholder: 'Auth Service' },
+            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' }
+        ],
+        'sms:aliyun': [
+            { key: 'accessKeyId', label: 'AccessKey ID', type: 'text', required: true, placeholder: 'LTAI...' },
+            { key: 'accessKeySecret', label: 'AccessKey Secret', type: 'password', required: true },
+            { key: 'signName', label: '短信签名 signName', type: 'text', required: true, placeholder: '你在阿里云报备的签名' },
+            { key: 'templateCode', label: '模板 CODE templateCode', type: 'text', required: true, placeholder: 'SMS_xxxxxxxx（模板须含 ${code}）' },
+            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' }
+        ],
+        'oauth:gitee': [
+            { key: 'clientId', label: 'Client ID', type: 'text', required: true },
+            { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/gitee/callback' },
+            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'user_info', default: 'user_info' }
+        ],
+        'oauth:microsoft': [
+            { key: 'clientId', label: '应用(客户端) ID', type: 'text', required: true },
+            { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/microsoft/callback' },
+            { key: 'tenant', label: '租户 tenant', type: 'text', required: false, placeholder: 'common 或你的租户ID', default: 'common' },
+            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'openid profile email', default: 'openid profile email' }
+        ],
+        'oauth:github': [
+            { key: 'clientId', label: 'Client ID', type: 'text', required: true },
+            { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
+            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://你的域名/api/auth/oauth/github/callback' },
+            { key: 'scope', label: '授权范围 scope', type: 'text', required: false, placeholder: 'read:user', default: 'read:user' }
+        ]
+    };
+
     async function loadLoginMethods() {
         loginMethodsScope = Auth.isPlatformTenant() ? 'platform' : 'tenant';
         const titleEl = document.getElementById('loginMethodsTitle');
@@ -1236,46 +1273,108 @@
         const enabledSel = document.getElementById('loginMethodEnabled');
         enabledSel.value = String(m.enabled ?? 0);
         enabledSel.disabled = m.platformLocked === true; // password 平台锁定
+
         const usePlatformGroup = document.getElementById('loginMethodUsePlatformGroup');
-        const configHint = document.getElementById('loginMethodConfigHint');
         if (loginMethodsScope === 'tenant') {
             usePlatformGroup.style.display = '';
             document.getElementById('loginMethodUsePlatform').value = String(m.usePlatformConfig ?? 1);
-            configHint.textContent = '选择“使用本租户自有凭证”后填写下方 JSON（留空表示不修改）。';
         } else {
             usePlatformGroup.style.display = 'none';
-            configHint.textContent = '填写该方式的默认凭证 JSON（留空表示不修改）。password 无需凭证。';
         }
-        document.getElementById('loginMethodConfigJson').value = '';
+
+        renderCredentialFields(m.method);
+        updateCredentialVisibility();
         openModal('loginMethodModal');
+    }
+
+    /** 按 method 渲染凭证字段表单（password 等无凭证方式显示提示） */
+    function renderCredentialFields(method) {
+        const container = document.getElementById('loginMethodConfigFields');
+        const fields = CREDENTIAL_FIELDS[method];
+        if (!fields) {
+            container.innerHTML = '<div class="form-text" style="padding:8px 0;">该登录方式无需凭证。</div>';
+            return;
+        }
+        container.innerHTML = fields.map(f => `
+            <div class="form-group">
+                <label>${escapeHtml(f.label)}${f.required ? ' <span class="required-mark">*</span>' : ''}</label>
+                <input type="${f.type}" class="form-control" data-field="${f.key}"
+                       placeholder="${escapeHtml(f.placeholder || (f.default ? '默认 ' + f.default : ''))}"
+                       autocomplete="off">
+            </div>
+        `).join('');
+    }
+
+    /** 根据当前 scope/凭证来源/方式 切换凭证字段区显隐 */
+    function updateCredentialVisibility() {
+        const method = document.getElementById('loginMethodCode').value;
+        const hasFields = !!CREDENTIAL_FIELDS[method];
+        const configGroup = document.getElementById('loginMethodConfigGroup');
+        const hint = document.getElementById('loginMethodConfigHint');
+        const fieldsBox = document.getElementById('loginMethodConfigFields');
+        if (!hasFields) {
+            configGroup.style.display = 'none';
+            hint.textContent = '';
+            return;
+        }
+        configGroup.style.display = '';
+        if (loginMethodsScope === 'platform') {
+            fieldsBox.style.display = '';
+            hint.textContent = '填写后将整组覆盖默认凭证（全部留空则不修改）。修改时需填全所有必填项。';
+        } else {
+            const usePlatform = parseInt(document.getElementById('loginMethodUsePlatform').value);
+            if (usePlatform === 1) {
+                fieldsBox.style.display = 'none';
+                hint.textContent = '当前使用平台默认凭证。如需改用本租户自有凭证，请将上方“凭证来源”切换为“使用本租户自有凭证”。';
+            } else {
+                fieldsBox.style.display = '';
+                hint.textContent = '填写本租户自有凭证（全部留空则不修改）。需填全所有必填项。';
+            }
+        }
     }
 
     function setupLoginMethodModal() {
         const saveBtn = document.getElementById('loginMethodSaveBtn');
         if (saveBtn) {
-            saveBtn.addEventListener('click', async () => {
-                await saveLoginMethod();
-            });
+            saveBtn.addEventListener('click', async () => { await saveLoginMethod(); });
+        }
+        const usePlatformSel = document.getElementById('loginMethodUsePlatform');
+        if (usePlatformSel) {
+            usePlatformSel.addEventListener('change', updateCredentialVisibility);
         }
     }
 
     async function saveLoginMethod() {
         const method = document.getElementById('loginMethodCode').value;
         const enabled = parseInt(document.getElementById('loginMethodEnabled').value);
-        const configJson = document.getElementById('loginMethodConfigJson').value.trim();
         const data = { enabled };
         if (loginMethodsScope === 'tenant') {
             data.usePlatformConfig = parseInt(document.getElementById('loginMethodUsePlatform').value);
         }
-        if (configJson) {
-            try {
-                JSON.parse(configJson);
-            } catch (e) {
-                Toast.error('凭证 JSON 格式不合法: ' + e.message);
-                return;
+
+        // 收集凭证字段（仅平台级，或租户级选择"自有凭证"时）
+        const fields = CREDENTIAL_FIELDS[method];
+        const needCredential = fields && (loginMethodsScope === 'platform'
+            || (loginMethodsScope === 'tenant' && data.usePlatformConfig === 0));
+        if (needCredential) {
+            const cred = {};
+            let hasInput = false;
+            let missing = null;
+            fields.forEach(f => {
+                const input = document.querySelector('#loginMethodConfigFields [data-field="' + f.key + '"]');
+                const val = input ? input.value.trim() : '';
+                if (val) { cred[f.key] = val; hasInput = true; }
+                else if (f.default) { cred[f.key] = f.default; }
+                else { cred[f.key] = ''; }
+                if (f.required && !cred[f.key]) { missing = f.label; }
+            });
+            if (hasInput) {
+                if (missing) { Toast.error('请填写必填项：' + missing); return; }
+                data.configJson = JSON.stringify(cred);
             }
-            data.configJson = configJson;
+            // 全部留空 → 不传 configJson，保留原凭证
         }
+
         try {
             if (loginMethodsScope === 'platform') {
                 await API.LoginMethods.savePlatform(method, data);
