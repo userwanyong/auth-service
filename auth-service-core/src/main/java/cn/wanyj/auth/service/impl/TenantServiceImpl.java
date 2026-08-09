@@ -77,6 +77,14 @@ public class TenantServiceImpl implements TenantService {
     }
 
     @Override
+    public Tenant getTenantByUid(String tenantUid) {
+        if (tenantUid == null || tenantUid.isBlank()) {
+            return null;
+        }
+        return tenantMapper.findByUid(tenantUid);
+    }
+
+    @Override
     public boolean existsByCode(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
             return false;
@@ -100,6 +108,9 @@ public class TenantServiceImpl implements TenantService {
             tenant.setMaxUsers(Integer.MAX_VALUE);
         }
 
+        // 生成对外租户标识（随机串，防枚举）
+        tenant.setTenantUid(generateUniqueUid());
+
         tenantMapper.insert(tenant);
 
         // 初始化默认角色和权限
@@ -107,6 +118,28 @@ public class TenantServiceImpl implements TenantService {
 
         log.info("Created tenant with default roles: code={}, name={}", tenant.getTenantCode(), tenant.getTenantName());
         return tenant;
+    }
+
+    /** 对外租户标识的字符集与长度 */
+    private static final String UID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+    private static final int UID_LENGTH = 8;
+
+    /**
+     * 生成唯一的对外租户标识：SecureRandom 取 8 位 [a-z0-9]，DB 唯一约束兜底，最多重试 5 次。
+     */
+    private String generateUniqueUid() {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        for (int i = 0; i < 5; i++) {
+            StringBuilder sb = new StringBuilder(UID_LENGTH);
+            for (int j = 0; j < UID_LENGTH; j++) {
+                sb.append(UID_CHARS.charAt(random.nextInt(UID_CHARS.length())));
+            }
+            String uid = sb.toString();
+            if (!tenantMapper.existsByUid(uid)) {
+                return uid;
+            }
+        }
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "租户标识生成失败，请重试");
     }
 
     @Override

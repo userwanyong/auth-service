@@ -20,6 +20,7 @@ USE `auth_service`;
 CREATE TABLE IF NOT EXISTS `tenant` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '租户ID',
   `tenant_code` VARCHAR(50) NOT NULL COMMENT '租户编码（唯一标识）',
+  `tenant_uid` VARCHAR(16) NOT NULL COMMENT '对外租户标识（随机串，防枚举）',
   `tenant_name` VARCHAR(100) NOT NULL COMMENT '租户名称',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `expired_at` DATETIME DEFAULT NULL COMMENT '过期时间（NULL表示永不过期）',
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `tenant` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_code` (`tenant_code`),
+  UNIQUE KEY `uk_tenant_uid` (`tenant_uid`),
   KEY `idx_status` (`status`),
   KEY `idx_expired_at` (`expired_at`),
   KEY `idx_is_platform` (`is_platform`)
@@ -172,10 +174,10 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
 
 -- Insert tenants (需要 NO_AUTO_VALUE_ON_ZERO 允许 id=0)
 SET sql_mode='NO_AUTO_VALUE_ON_ZERO';
-INSERT INTO `tenant` (`id`, `tenant_code`, `tenant_name`, `status`, `max_users`, `is_platform`) VALUES
-(0, 'platform', '平台租户', 1, 1000, 1),
-(1, 'demo', '演示租户', 1, 100, 0)
-ON DUPLICATE KEY UPDATE `tenant_name` = VALUES(`tenant_name`), `is_platform` = VALUES(`is_platform`);
+INSERT INTO `tenant` (`id`, `tenant_code`, `tenant_uid`, `tenant_name`, `status`, `max_users`, `is_platform`) VALUES
+(0, 'platform', 'pk7q2m8e', '平台租户', 1, 1000, 1),
+(1, 'demo', 'dm3a9x1f', '演示租户', 1, 100, 0)
+ON DUPLICATE KEY UPDATE `tenant_name` = VALUES(`tenant_name`), `is_platform` = VALUES(`is_platform`), `tenant_uid` = VALUES(`tenant_uid`);
 SET sql_mode=(SELECT REPLACE(@@sql_mode,'NO_AUTO_VALUE_ON_ZERO',''));
 
 -- Insert roles
@@ -227,8 +229,8 @@ SELECT 1, 2, `id` FROM `permission` WHERE `tenant_id` = 1 AND `code` = 'user:rea
 -- Insert default platform admin user (username: admin, password: 123456)
 -- Password is bcrypt hash of '123456'
 SET sql_mode='NO_AUTO_VALUE_ON_ZERO';
-INSERT INTO `user` (`id`, `tenant_id`, `username`, `password`, `nickname`, `status`, `email_verified`) VALUES
-(0, 0, 'admin', '$2a$10$z/I75HJV6HhtTpT1fzgcZ.WMzOPvej2.0trqSqgleMPdHUvJUxGDC', '平台管理员', 1, TRUE)
+INSERT INTO `user` (`id`, `tenant_id`, `username`, `password`, `nickname`, `status`) VALUES
+(0, 0, 'admin', '$2a$10$z/I75HJV6HhtTpT1fzgcZ.WMzOPvej2.0trqSqgleMPdHUvJUxGDC', '平台管理员', 1)
 ON DUPLICATE KEY UPDATE `password` = VALUES(`password`);
 SET sql_mode=(SELECT REPLACE(@@sql_mode,'NO_AUTO_VALUE_ON_ZERO',''));
 
@@ -239,8 +241,8 @@ VALUES (0, 0, 0);
 -- Insert default demo tenant admin user (username: admin, password: 123456)
 -- Password is bcrypt hash of '123456'
 SET sql_mode='NO_AUTO_VALUE_ON_ZERO';
-INSERT INTO `user` (`id`, `tenant_id`, `username`, `password`, `nickname`, `status`, `email_verified`) VALUES
-(1, 1, 'admin', '$2a$10$z/I75HJV6HhtTpT1fzgcZ.WMzOPvej2.0trqSqgleMPdHUvJUxGDC', '演示管理员', 1, TRUE)
+INSERT INTO `user` (`id`, `tenant_id`, `username`, `password`, `nickname`, `status`) VALUES
+(1, 1, 'admin', '$2a$10$z/I75HJV6HhtTpT1fzgcZ.WMzOPvej2.0trqSqgleMPdHUvJUxGDC', '演示管理员', 1)
 ON DUPLICATE KEY UPDATE `password` = VALUES(`password`);
 SET sql_mode=(SELECT REPLACE(@@sql_mode,'NO_AUTO_VALUE_ON_ZERO',''));
 

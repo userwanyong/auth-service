@@ -130,8 +130,8 @@ const API = (function() {
          * User login
          * POST /api/auth/login
          */
-        login: (username, password, tenantId) =>
-            postJson('/auth/login', { username, password, tenantId }),
+        login: (username, password, tenantUid) =>
+            postJson('/auth/login', { username, password, tenantUid }),
 
         /**
          * User register
@@ -334,7 +334,7 @@ const API = (function() {
          * Get tenant by ID
          * GET /api/tenant/{id}
          */
-        getById: (id) => get(`/tenant/${id}`),
+        getById: (uid) => get(`/tenant/${uid}`),
 
         /**
          * Create tenant
@@ -353,8 +353,8 @@ const API = (function() {
          * Update tenant
          * PUT /api/tenant/{id}
          */
-        update: (id, data) => {
-            return request(`/tenant/${id}`, {
+        update: (uid, data) => {
+            return request(`/tenant/${uid}`, {
                 method: 'PUT',
                 body: JSON.stringify(data)
             });
@@ -364,7 +364,7 @@ const API = (function() {
          * Delete tenant
          * DELETE /api/tenant/{id}
          */
-        delete: (id) => del(`/tenant/${id}`),
+        delete: (uid) => del(`/tenant/${uid}`),
 
         /**
          * Check if tenant code is available

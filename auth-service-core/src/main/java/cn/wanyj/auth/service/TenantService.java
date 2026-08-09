@@ -49,6 +49,14 @@ public interface TenantService {
     Tenant getTenantByCode(String tenantCode);
 
     /**
+     * 根据对外标识获取租户
+     *
+     * @param tenantUid 对外租户标识
+     * @return 租户信息，不存在返回 null
+     */
+    Tenant getTenantByUid(String tenantUid);
+
+    /**
      * 获取所有租户列表
      *
      * @return 租户列表

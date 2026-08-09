@@ -29,6 +29,11 @@ public class TenantResponse {
     private String tenantCode;
 
     /**
+     * 对外租户标识（随机串，防枚举）
+     */
+    private String tenantUid;
+
+    /**
      * 租户名称
      */
     private String tenantName;

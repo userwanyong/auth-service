@@ -7,6 +7,7 @@
     <resultMap id="TenantResultMap" type="cn.wanyj.auth.entity.Tenant">
         <id property="id" column="id"/>
         <result property="tenantCode" column="tenant_code"/>
+        <result property="tenantUid" column="tenant_uid"/>
         <result property="tenantName" column="tenant_name"/>
         <result property="status" column="status"/>
         <result property="expiredAt" column="expired_at"/>
@@ -18,7 +19,7 @@
 
     <!-- Find By Id -->
     <select id="findById" resultMap="TenantResultMap">
-        SELECT id, tenant_code, tenant_name, status, expired_at,
+        SELECT id, tenant_code, tenant_uid, tenant_name, status, expired_at,
                max_users, is_platform, created_at, updated_at
         FROM tenant
         WHERE id = #{id}
@@ -26,7 +27,7 @@
 
     <!-- Find By Code -->
     <select id="findByCode" resultMap="TenantResultMap">
-        SELECT id, tenant_code, tenant_name, status, expired_at,
+        SELECT id, tenant_code, tenant_uid, tenant_name, status, expired_at,
                max_users, is_platform, created_at, updated_at
         FROM tenant
         WHERE tenant_code = #{tenantCode}
@@ -34,7 +35,7 @@
 
     <!-- Find All -->
     <select id="findAll" resultMap="TenantResultMap">
-        SELECT id, tenant_code, tenant_name, status, expired_at,
+        SELECT id, tenant_code, tenant_uid, tenant_name, status, expired_at,
                max_users, is_platform, created_at, updated_at
         FROM tenant
         ORDER BY id
@@ -42,7 +43,7 @@
 
     <!-- Find Active (for login page) -->
     <select id="findActive" resultMap="TenantResultMap">
-        SELECT id, tenant_code, tenant_name, status, expired_at,
+        SELECT id, tenant_code, tenant_uid, tenant_name, status, expired_at,
                max_users, is_platform, created_at, updated_at
         FROM tenant
         WHERE status = 1
@@ -57,10 +58,25 @@
         WHERE tenant_code = #{tenantCode}
     </select>
 
+    <!-- Find By Uid -->
+    <select id="findByUid" resultMap="TenantResultMap">
+        SELECT id, tenant_code, tenant_uid, tenant_name, status, expired_at,
+               max_users, is_platform, created_at, updated_at
+        FROM tenant
+        WHERE tenant_uid = #{tenantUid}
+    </select>
+
+    <!-- Exists By Uid -->
+    <select id="existsByUid" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM tenant
+        WHERE tenant_uid = #{tenantUid}
+    </select>
+
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.Tenant" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO tenant (tenant_code, tenant_name, status, expired_at, max_users, is_platform)
-        VALUES (#{tenantCode}, #{tenantName}, #{status}, #{expiredAt}, #{maxUsers}, #{isPlatform})
+        INSERT INTO tenant (tenant_code, tenant_uid, tenant_name, status, expired_at, max_users, is_platform)
+        VALUES (#{tenantCode}, #{tenantUid}, #{tenantName}, #{status}, #{expiredAt}, #{maxUsers}, #{isPlatform})
     </insert>
 
     <!-- Update -->

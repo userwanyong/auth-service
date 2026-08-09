@@ -34,12 +34,12 @@
 
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
-            const tenantIdValue = document.getElementById('loginTenantId').value;
+            const tenantUidValue = document.getElementById('loginTenantId').value;
 
-            console.log('Login form values:', { username, passwordLength: password?.length, tenantIdValue });
+            console.log('Login form values:', { username, passwordLength: password?.length, tenantUidValue });
 
-            // Check if tenantIdValue is empty (not falsy, since 0 is a valid ID)
-            if (!username || !password || tenantIdValue === '') {
+            // Check if tenantUidValue is empty (not falsy, since 0 is a valid ID)
+            if (!username || !password || tenantUidValue === '') {
                 Toast.error('请填写所有必填项');
                 return;
             }
@@ -50,7 +50,7 @@
             submitBtn.textContent = '登录中...';
 
             try {
-                const tokenResponse = await API.Auth.login(username, password, tenantIdValue);
+                const tokenResponse = await API.Auth.login(username, password, tenantUidValue);
 
                 // Save token first (needed for subsequent API calls)
                 // User info will be fetched on the dashboard
@@ -91,7 +91,7 @@
 
             // Populate with fetched tenants
             tenants.forEach(tenant => {
-                const option = `<option value="${tenant.id}">${escapeHtml(tenant.tenantName)} (${escapeHtml(tenant.tenantCode)})</option>`;
+                const option = `<option value="${tenant.tenantUid}">${escapeHtml(tenant.tenantName)} (${escapeHtml(tenant.tenantCode)})</option>`;
                 loginTenantSelect.insertAdjacentHTML('beforeend', option);
             });
         } catch (error) {

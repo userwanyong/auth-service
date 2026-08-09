@@ -945,7 +945,7 @@
 
         tbody.innerHTML = tenantsData.map(t => `
             <tr>
-                <td>${t.id}</td>
+                <td>${escapeHtml(t.tenantUid)}</td>
                 <td>${escapeHtml(t.tenantCode)}</td>
                 <td>${escapeHtml(t.tenantName)}</td>
                 <td>${t.status === 1 ?
@@ -955,8 +955,8 @@
                 <td>${t.expiredAt ? new Date(t.expiredAt).toLocaleDateString() : '-'}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-outline" onclick='App.editTenant(${quoteJsString(t.id)})'>编辑</button>
-                        ${!isPlatformTenantId(t.id) ? `<button class="btn btn-sm btn-danger" onclick='App.deleteTenant(${quoteJsString(t.id)})'>删除</button>` : ''}
+                        <button class="btn btn-sm btn-outline" onclick='App.editTenant(${quoteJsString(t.tenantUid)})'>编辑</button>
+                        ${!isPlatformTenantId(t.id) ? `<button class="btn btn-sm btn-danger" onclick='App.deleteTenant(${quoteJsString(t.tenantUid)})'>删除</button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -975,7 +975,7 @@
 
     async function openTenantModal(tenant = null) {
         document.getElementById('tenantModalTitle').textContent = tenant ? '编辑租户' : '添加租户';
-        document.getElementById('tenantId').value = tenant ? tenant.id : '';
+        document.getElementById('tenantId').value = tenant ? tenant.tenantUid : '';
         document.getElementById('tenantCode').value = tenant ? tenant.tenantCode : '';
         document.getElementById('tenantCode').disabled = !!tenant;
         document.getElementById('tenantName').value = tenant ? tenant.tenantName : '';
@@ -1021,21 +1021,21 @@
         }
     }
 
-    async function editTenant(id) {
-        const tenant = tenantsData.find(t => String(t.id) === String(id));
+    async function editTenant(uid) {
+        const tenant = tenantsData.find(t => String(t.tenantUid) === String(uid));
         if (tenant) {
             openTenantModal(tenant);
         }
     }
 
-    async function deleteTenant(id) {
+    async function deleteTenant(uid) {
         // Get tenant info to show in warning
         let tenantName = '';
         try {
-            const tenant = await API.Tenants.getById(id);
-            tenantName = tenant.tenantName || tenant.tenantCode || `ID: ${id}`;
+            const tenant = await API.Tenants.getById(uid);
+            tenantName = tenant.tenantName || tenant.tenantCode || `标识: ${uid}`;
         } catch (e) {
-            tenantName = `ID: ${id}`;
+            tenantName = `标识: ${uid}`;
         }
 
         const warningMessage = `确定要删除租户「${tenantName}」吗？\n\n` +
@@ -1050,7 +1050,7 @@
         if (!confirm(warningMessage)) return;
 
         try {
-            await API.Tenants.delete(id);
+            await API.Tenants.delete(uid);
             Toast.success('租户删除成功');
             await loadTenants();
         } catch (error) {

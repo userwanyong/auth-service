@@ -63,15 +63,15 @@ public class TenantController {
      * 更新租户
      * 仅管理员可访问
      */
-    @PutMapping("/{id}")
+    @PutMapping("/{uid}")
     @PreAuthorizePlatformAdmin
     public ResponseEntity<ApiResponse<TenantResponse>> updateTenant(
-            @PathVariable Long id,
+            @PathVariable String uid,
             @Valid @RequestBody TenantUpdateRequest request) {
 
-        log.info("Updating tenant: {}", id);
+        log.info("Updating tenant: {}", uid);
 
-        Tenant tenant = tenantService.getTenantById(id);
+        Tenant tenant = tenantService.getTenantByUid(uid);
         if (tenant == null) {
             throw new BusinessException(ErrorCode.TENANT_NOT_FOUND);
         }
@@ -89,7 +89,6 @@ public class TenantController {
         if (request.getMaxUsers() != null) {
             tenant.setMaxUsers(request.getMaxUsers());
         }
-        tenant.setId(id);
 
         Tenant updated = tenantService.updateTenant(tenant);
         return ResponseEntity.ok(ApiResponse.success(200, "租户更新成功", mapToResponse(updated)));
@@ -99,12 +98,12 @@ public class TenantController {
      * 获取租户详情
      * 仅管理员可访问
      */
-    @GetMapping("/{id}")
+    @GetMapping("/{uid}")
     @PreAuthorizePlatformAdmin
-    public ResponseEntity<ApiResponse<TenantResponse>> getTenant(@PathVariable Long id) {
-        log.info("Getting tenant: {}", id);
+    public ResponseEntity<ApiResponse<TenantResponse>> getTenant(@PathVariable String uid) {
+        log.info("Getting tenant: {}", uid);
 
-        Tenant tenant = tenantService.getTenantById(id);
+        Tenant tenant = tenantService.getTenantByUid(uid);
         if (tenant == null) {
             throw new BusinessException(ErrorCode.TENANT_NOT_FOUND);
         }
@@ -133,17 +132,22 @@ public class TenantController {
      * 删除租户
      * 仅管理员可访问
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{uid}")
     @PreAuthorizePlatformAdmin
-    public ResponseEntity<ApiResponse<Void>> deleteTenant(@PathVariable Long id) {
-        log.info("Deleting tenant: {}", id);
+    public ResponseEntity<ApiResponse<Void>> deleteTenant(@PathVariable String uid) {
+        log.info("Deleting tenant: {}", uid);
 
-        // 不允许删除平台租户（id=0）
-        if (id.equals(0L)) {
+        Tenant tenant = tenantService.getTenantByUid(uid);
+        if (tenant == null) {
+            throw new BusinessException(ErrorCode.TENANT_NOT_FOUND);
+        }
+
+        // 不允许删除平台租户
+        if (tenant.isPlatformTenant()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "不允许删除平台租户");
         }
 
-        tenantService.deleteTenant(id);
+        tenantService.deleteTenant(tenant.getId());
         return ResponseEntity.ok(ApiResponse.success(200, "租户删除成功", null));
     }
 
@@ -177,8 +181,8 @@ public class TenantController {
      */
     private TenantResponse mapToSimpleResponse(cn.wanyj.auth.entity.Tenant tenant) {
         return TenantResponse.builder()
-                .id(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
+                .tenantUid(tenant.getTenantUid())
                 .tenantName(tenant.getTenantName())
                 .status(tenant.getStatus())
                 .build();
@@ -193,6 +197,7 @@ public class TenantController {
         return TenantResponse.builder()
                 .id(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
+                .tenantUid(tenant.getTenantUid())
                 .tenantName(tenant.getTenantName())
                 .status(tenant.getStatus())
                 .expiredAt(tenant.getExpiredAt())

@@ -55,6 +55,22 @@ public interface TenantMapper {
     boolean existsByCode(@Param("tenantCode") String tenantCode);
 
     /**
+     * 根据对外标识查询租户
+     *
+     * @param tenantUid 对外租户标识
+     * @return 租户信息
+     */
+    Tenant findByUid(@Param("tenantUid") String tenantUid);
+
+    /**
+     * 检查对外标识是否已存在
+     *
+     * @param tenantUid 对外租户标识
+     * @return 是否存在
+     */
+    boolean existsByUid(@Param("tenantUid") String tenantUid);
+
+    /**
      * 插入租户
      *
      * @param tenant 租户信息

@@ -1,7 +1,6 @@
 package cn.wanyj.auth.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,8 +24,8 @@ public class LoginRequest {
     private String password;
 
     /**
-     * 租户ID - 必填，指定登录到哪个租户
+     * 租户对外标识 - 必填，指定登录到哪个租户（随机串，防枚举）
      */
-    @NotNull(message = "租户ID不能为空")
-    private Long tenantId;
+    @NotBlank(message = "租户标识不能为空")
+    private String tenantUid;
 }

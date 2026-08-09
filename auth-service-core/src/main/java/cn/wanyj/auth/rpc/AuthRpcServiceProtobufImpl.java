@@ -7,9 +7,12 @@ import cn.wanyj.auth.dto.request.RegisterRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.rpc.converter.UserProtobufConverter;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.service.TenantService;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     private final AuthService authService;
     private final UserService userService;
+    private final TenantService tenantService;
 
     @Override
     public RegisterRpcResult register(RegisterRpcRequest request) {
@@ -85,11 +89,16 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
     public AuthResult authenticate(LoginRpcRequest request) {
         log.info("RPC authenticate: username={}, tenantId={}", request.getUsername(), request.getTenantId());
         try {
+            // RPC 内部按数字 tenantId 定位租户，转对外 uid 走统一登录入口
+            Tenant tenant = tenantService.getTenantById(Long.parseLong(request.getTenantId()));
+            if (tenant == null || tenant.getTenantUid() == null) {
+                throw new BusinessException(ErrorCode.INVALID_TENANT);
+            }
             TokenResponse tokenResponse = authService.login(
                 LoginRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
-                    .tenantId(Long.parseLong(request.getTenantId()))
+                    .tenantUid(tenant.getTenantUid())
                     .build()
             );
 

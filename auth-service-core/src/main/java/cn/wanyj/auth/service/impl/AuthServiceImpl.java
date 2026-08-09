@@ -9,6 +9,7 @@ import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.entity.Role;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.entity.User;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
@@ -150,8 +151,12 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Auditable(action = "LOGIN", resource = "User")
     public TokenResponse login(LoginRequest request) {
-        // tenantId is required, no default fallback
-        Long tenantId = request.getTenantId();
+        // 通过对外标识定位租户，再取内部 id（对外不暴露自增 id）
+        Tenant tenant = tenantService.getTenantByUid(request.getTenantUid());
+        if (tenant == null || !tenant.isValid()) {
+            throw new BusinessException(ErrorCode.INVALID_TENANT);
+        }
+        Long tenantId = tenant.getId();
         log.info("User login attempt: {} in tenant: {}", request.getUsername(), tenantId);
 
         // Check login rate limit
