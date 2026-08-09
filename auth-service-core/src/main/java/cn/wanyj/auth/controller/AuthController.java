@@ -10,6 +10,7 @@ import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.ApiResponse;
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.service.oauth.OAuthLoginService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuthLoginService oAuthLoginService;
 
     /**
      * User registration (auto-login)
@@ -76,6 +78,31 @@ public class AuthController {
         log.info("Login by code: method={}", request.getMethod());
         TokenResponse token = authService.loginByCode(request);
         return ResponseEntity.ok(ApiResponse.success(200, "登录成功", token));
+    }
+
+    /**
+     * OAuth 授权入口：校验开关 + 生成 state，302 重定向到提供方授权页
+     * GET /api/auth/oauth/{provider}/authorize?tenantUid=xxx
+     */
+    @GetMapping("/oauth/{provider}/authorize")
+    public ResponseEntity<Void> oauthAuthorize(@PathVariable String provider,
+                                               @RequestParam String tenantUid) {
+        String url = oAuthLoginService.buildAuthorizeUrl(tenantUid, provider);
+        return ResponseEntity.status(302).header("Location", url).build();
+    }
+
+    /**
+     * OAuth 回调：校验 state + 换 token + 匹配/建用户 + 签发 token，302 回前端
+     * GET /api/auth/oauth/{provider}/callback?code=xxx&state=xxx
+     */
+    @GetMapping("/oauth/{provider}/callback")
+    public ResponseEntity<Void> oauthCallback(@PathVariable String provider,
+                                              @RequestParam("code") String code,
+                                              @RequestParam(value = "state", required = false) String state) {
+        TokenResponse token = oAuthLoginService.handleCallback(provider, code, state);
+        String redirect = "/login.html#oauth=success&accessToken=" + token.getAccessToken()
+                + "&refreshToken=" + token.getRefreshToken();
+        return ResponseEntity.status(302).header("Location", redirect).build();
     }
 
     /**

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.wanyj.auth.mapper.UserOauthMapper">
+
+    <resultMap id="UserOauthResultMap" type="cn.wanyj.auth.entity.UserOauth">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="provider" column="provider"/>
+        <result property="providerUid" column="provider_uid"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByTenantProviderUid" resultMap="UserOauthResultMap">
+        SELECT id, tenant_id, user_id, provider, provider_uid, created_at, updated_at
+        FROM user_oauth
+        WHERE tenant_id = #{tenantId}
+          AND provider = #{provider}
+          AND provider_uid = #{providerUid}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO user_oauth (tenant_id, user_id, provider, provider_uid)
+        VALUES (#{tenantId}, #{userId}, #{provider}, #{providerUid})
+    </insert>
+
+</mapper>

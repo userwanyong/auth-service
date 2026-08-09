@@ -17,6 +17,19 @@
     ];
 
     function init() {
+        // OAuth 回调：URL fragment 形如 #oauth=success&accessToken=...&refreshToken=...
+        if (window.location.hash && window.location.hash.indexOf('oauth=success') !== -1) {
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const at = params.get('accessToken');
+            const rt = params.get('refreshToken');
+            if (at && rt) {
+                localStorage.setItem('auth_access_token', at);
+                localStorage.setItem('auth_refresh_token', rt);
+                window.location.hash = '';
+                window.location.href = '/';
+                return;
+            }
+        }
         if (Auth.isAuthenticated()) {
             window.location.href = '/';
             return;
@@ -232,7 +245,14 @@
             }).join('');
             container.querySelectorAll('.btn-social').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    Toast.info('该登录方式将在后续阶段上线');
+                    const provider = btn.dataset.method.split(':')[1];
+                    const tenantUid = document.getElementById('loginTenantId').value;
+                    if (!tenantUid) {
+                        Toast.error('请先选择租户');
+                        return;
+                    }
+                    window.location.href = '/api/auth/oauth/' + encodeURIComponent(provider)
+                        + '/authorize?tenantUid=' + encodeURIComponent(tenantUid);
                 });
             });
         } else {

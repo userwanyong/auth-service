@@ -184,6 +184,25 @@ INSERT INTO `login_method_config` (`tenant_id`, `method`, `enabled`, `use_platfo
 (0, 'password', 1, 1, NULL) ON DUPLICATE KEY UPDATE `enabled` = 1;
 
 -- ============================================
+-- Table: user_oauth (OAuth 账号绑定表 - 多租户隔离)
+-- 按 (tenant_id, provider, provider_uid) 匹配本地用户；同一用户同一 provider 仅绑定一次
+-- ============================================
+CREATE TABLE IF NOT EXISTS `user_oauth` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `user_id` BIGINT NOT NULL COMMENT '本地用户ID',
+  `provider` VARCHAR(32) NOT NULL COMMENT 'OAuth提供方：gitee/microsoft/github',
+  `provider_uid` VARCHAR(64) NOT NULL COMMENT '提供方用户唯一ID',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_provider_uid` (`tenant_id`, `provider`, `provider_uid`),
+  UNIQUE KEY `uk_tenant_user_provider` (`tenant_id`, `user_id`, `provider`),
+  KEY `idx_tenant_id` (`tenant_id`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth账号绑定表';
+
+-- ============================================
 -- Initial Data (初始数据)
 -- ============================================
 -- 注意：如需重新初始化，请先手动清空相关表数据
