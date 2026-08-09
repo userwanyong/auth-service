@@ -427,6 +427,9 @@ const API = (function() {
         /** 当前用户的第三方绑定列表 */
         listMyBindings: () => get('/auth/me/oauth'),
 
+        /** 获取绑定授权 URL（需登录态，fetch 带 token 拿到 URL 再由前端跳转） */
+        getBindUrl: (provider) => get('/auth/oauth/' + encodeURIComponent(provider) + '/bind'),
+
         /** 解绑某第三方平台 */
         unbind: (provider) => del('/auth/me/oauth/' + encodeURIComponent(provider))
     };

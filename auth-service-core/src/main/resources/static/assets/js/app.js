@@ -1437,8 +1437,14 @@
         }).join('');
     }
 
-    function bindProvider(provider) {
-        window.location.href = '/api/auth/oauth/' + encodeURIComponent(provider) + '/bind';
+    async function bindProvider(provider) {
+        // bind 端点需登录态，浏览器导航(window.location)不会带 JWT，所以先 fetch(带 Authorization)拿授权 URL 再跳转
+        try {
+            const url = await API.LoginMethods.getBindUrl(provider);
+            window.location.href = url;
+        } catch (error) {
+            Toast.error('发起绑定失败: ' + error.message);
+        }
     }
 
     async function unbindBinding(provider) {

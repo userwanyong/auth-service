@@ -122,11 +122,11 @@ public class AuthController {
      * GET /api/auth/oauth/{provider}/bind
      */
     @GetMapping("/oauth/{provider}/bind")
-    public ResponseEntity<Void> oauthBind(@PathVariable String provider) {
+    public ResponseEntity<ApiResponse<String>> oauthBind(@PathVariable String provider) {
         Long userId = SecurityUtils.getCurrentUserId();
         Long tenantId = SecurityUtils.getCurrentTenantId();
         String url = oAuthLoginService.buildBindAuthorizeUrl(tenantId, provider, userId);
-        return ResponseEntity.status(302).header("Location", url).build();
+        return ResponseEntity.ok(ApiResponse.success(url));
     }
 
     /**
