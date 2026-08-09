@@ -10,6 +10,7 @@
     let currentPage = 'dashboard';
     let usersData = { items: [], total: 0 };
     let rolesData = [];
+    let roleMap = {};
     let permissionsData = [];
     let tenantsData = [];
     let currentUsersPage = 1;
@@ -48,6 +49,9 @@
             window.location.href = '/login.html';
             return;
         }
+
+        // 先加载角色映射，用户信息区的角色徽章要显示角色名称
+        await ensureRoleMap();
 
         // Update user info display
         updateUserInfoDisplay();
@@ -95,10 +99,10 @@
         const tenantDisplay = isPlatformTenantId(user.tenantId) ? '平台租户' : `租户ID: ${user.tenantId}`;
         document.getElementById('userTenant').textContent = tenantDisplay;
 
-        // Header role badge
-        const roles = Auth.getUserRolesDisplay();
+        // Header role badge（显示角色名称）
+        const roleNames = (user.roles || []).map(r => roleDisplayName(r));
         const roleBadge = document.getElementById('userRoleBadge');
-        roleBadge.textContent = roles.join(', ') || '-';
+        roleBadge.textContent = roleNames.join(', ') || '-';
     }
 
     /**
@@ -345,8 +349,28 @@
     }
 
     // ========== Users ==========
+
+    /** 确保角色列表已加载，并维护 code→name 映射，用于把用户角色编码显示为名称 */
+    async function ensureRoleMap() {
+        if (!rolesData.length) {
+            try {
+                rolesData = await API.Roles.getAll();
+            } catch (error) {
+                rolesData = [];
+            }
+        }
+        roleMap = {};
+        rolesData.forEach(r => { roleMap[r.code] = r.name; });
+    }
+
+    /** 取角色显示名：优先用名称，取不到则去掉 ROLE_ 前缀的编码 */
+    function roleDisplayName(code) {
+        return roleMap[code] || (code ? code.replace('ROLE_', '') : '');
+    }
+
     async function loadUsers() {
         try {
+            await ensureRoleMap();
             const result = await API.Users.search(currentUsersPage, 10, currentUsersKeyword);
             usersData = result;
             renderUsersTable();
@@ -375,7 +399,7 @@
                     '<span class="badge badge-success">启用</span>' :
                     '<span class="badge badge-danger">禁用</span>'}</td>
                 <td>${Array.isArray(user.roles) && user.roles.length > 0 ? user.roles.map(r =>
-                    `<span class="badge badge-info">${r.replace('ROLE_', '')}</span>`
+                    `<span class="badge badge-info">${escapeHtml(roleDisplayName(r))}</span>`
                 ).join(' ') : '<span class="text-muted">无</span>'}</td>
                 <td>
                     <div class="action-buttons">
@@ -571,9 +595,10 @@
 
     async function showUserDetail(id) {
         try {
+            await ensureRoleMap();
             const user = await API.Users.getById(id);
             const rolesHtml = Array.isArray(user.roles) && user.roles.length > 0
-                ? user.roles.map(r => `<span class="badge badge-info">${escapeHtml(r.replace('ROLE_', ''))}</span>`).join(' ')
+                ? user.roles.map(r => `<span class="badge badge-info">${escapeHtml(roleDisplayName(r))}</span>`).join(' ')
                 : '<span class="text-muted">无</span>';
             const perms = Array.isArray(user.permissions) ? user.permissions : [];
             const permHtml = perms.length
