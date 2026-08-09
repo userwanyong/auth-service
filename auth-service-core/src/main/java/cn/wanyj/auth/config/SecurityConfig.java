@@ -78,8 +78,10 @@ public class SecurityConfig {
                         // Public API endpoints (register, login, refresh token, logout)
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
 
-                        // Public: login method discovery (login page) and OAuth authorize/callback flows
-                        .requestMatchers("/api/auth/login-methods", "/api/auth/oauth/**", "/api/auth/send-code", "/api/auth/login-by-code").permitAll()
+                        // Public: login method discovery (login page) and verification-code flows
+                        .requestMatchers("/api/auth/login-methods", "/api/auth/send-code", "/api/auth/login-by-code").permitAll()
+                        // Public: OAuth authorize (login page) + callback (provider redirect). bind requires login.
+                        .requestMatchers("/api/auth/oauth/*/authorize", "/api/auth/oauth/*/callback").permitAll()
 
                         // Tenant code check and available tenants (for login/registration)
                         .requestMatchers("/api/tenant/check-code", "/api/tenant/available").permitAll()

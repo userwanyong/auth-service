@@ -422,7 +422,13 @@ const API = (function() {
         saveTenant: (method, data) => put(`/tenant/login-methods/${method}`, data),
 
         /** 公开：按对外租户标识查询该租户对用户开放的登录方式列表（登录页动态渲染用） */
-        getEnabled: (tenantUid) => get('/auth/login-methods', { tenantUid })
+        getEnabled: (tenantUid) => get('/auth/login-methods', { tenantUid }),
+
+        /** 当前用户的第三方绑定列表 */
+        listMyBindings: () => get('/auth/me/oauth'),
+
+        /** 解绑某第三方平台 */
+        unbind: (provider) => del('/auth/me/oauth/' + encodeURIComponent(provider))
     };
 
     // Public API

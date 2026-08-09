@@ -10,6 +10,8 @@ import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.ApiResponse;
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.entity.UserOauth;
+import cn.wanyj.auth.service.oauth.OAuthCallbackResult;
 import cn.wanyj.auth.service.oauth.OAuthLoginService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Auth Controller - 认证控制器
@@ -99,10 +105,51 @@ public class AuthController {
     public ResponseEntity<Void> oauthCallback(@PathVariable String provider,
                                               @RequestParam("code") String code,
                                               @RequestParam(value = "state", required = false) String state) {
-        TokenResponse token = oAuthLoginService.handleCallback(provider, code, state);
-        String redirect = "/login.html#oauth=success&accessToken=" + token.getAccessToken()
-                + "&refreshToken=" + token.getRefreshToken();
+        OAuthCallbackResult result = oAuthLoginService.handleCallback(provider, code, state);
+        String redirect;
+        if (result.isLogin()) {
+            redirect = "/login.html#oauth=success&accessToken=" + result.getToken().getAccessToken()
+                    + "&refreshToken=" + result.getToken().getRefreshToken();
+        } else {
+            redirect = "/index.html#bindings&bind=" + (result.isSuccess() ? "success" : "failed")
+                    + "&msg=" + URLEncoder.encode(result.getMessage() == null ? "" : result.getMessage(), StandardCharsets.UTF_8);
+        }
         return ResponseEntity.status(302).header("Location", redirect).build();
+    }
+
+    /**
+     * 发起「绑定」授权（已登录用户把第三方账号绑到当前本地账号）
+     * GET /api/auth/oauth/{provider}/bind
+     */
+    @GetMapping("/oauth/{provider}/bind")
+    public ResponseEntity<Void> oauthBind(@PathVariable String provider) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        String url = oAuthLoginService.buildBindAuthorizeUrl(tenantId, provider, userId);
+        return ResponseEntity.status(302).header("Location", url).build();
+    }
+
+    /**
+     * 当前用户的第三方绑定列表
+     * GET /api/auth/me/oauth
+     */
+    @GetMapping("/me/oauth")
+    public ResponseEntity<ApiResponse<List<UserOauth>>> myBindings() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return ResponseEntity.ok(ApiResponse.success(oAuthLoginService.listBindings(tenantId, userId)));
+    }
+
+    /**
+     * 解绑某第三方平台
+     * DELETE /api/auth/me/oauth/{provider}
+     */
+    @DeleteMapping("/me/oauth/{provider}")
+    public ResponseEntity<ApiResponse<Void>> unbind(@PathVariable String provider) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        oAuthLoginService.unbind(tenantId, userId, provider);
+        return ResponseEntity.ok(ApiResponse.success(200, "解绑成功", null));
     }
 
     /**

@@ -67,32 +67,40 @@ public class OAuthLoginService {
         if (tenant == null || !tenant.isValid()) {
             throw new BusinessException(ErrorCode.INVALID_TENANT);
         }
-        if (!loginMethodConfigService.isEnabled(tenant.getId(), method)) {
+        Long tenantId = tenant.getId();
+        if (!loginMethodConfigService.isEnabled(tenantId, method)) {
             throw new BusinessException(ErrorCode.LOGIN_METHOD_DISABLED, "该登录方式未启用");
         }
-        Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenant.getId(), method));
-        String redirectUri = cfg.get("redirectUri");
-        if (redirectUri == null || redirectUri.isBlank()) {
-            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri（回调地址）");
-        }
+        Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenantId, method));
         OAuthProvider p = findProvider(provider);
-        String state = UUID.randomUUID().toString().replace("-", "");
-        String stateValue;
-        try {
-            stateValue = objectMapper.writeValueAsString(Map.of("t", tenantUid, "p", provider));
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OAuth state 序列化失败");
-        }
-        redisTemplate.opsForValue().set(STATE_PREFIX + state, stateValue,
-                STATE_TTL_SECONDS, TimeUnit.SECONDS);
-        return p.buildAuthorizeUrl(cfg, redirectUri, state);
+        String state = buildState(Map.of("mode", "login", "tid", String.valueOf(tenantId), "p", provider));
+        return p.buildAuthorizeUrl(cfg, requireRedirectUri(cfg), state);
     }
 
     /**
-     * 处理回调：校验 state → 换 token → 拉用户 → 匹配/建用户 → 签 token
+     * 发起「绑定」授权（已登录用户把第三方账号绑到当前本地账号）
+     */
+    public String buildBindAuthorizeUrl(Long tenantId, String provider, Long userId) {
+        String method = "oauth:" + provider;
+        if (!loginMethodConfigService.isEnabled(tenantId, method)) {
+            throw new BusinessException(ErrorCode.LOGIN_METHOD_DISABLED, "该登录方式未启用");
+        }
+        if (userOauthMapper.findByTenantUserProvider(tenantId, userId, provider) != null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "你已绑定该平台，无需重复绑定");
+        }
+        Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenantId, method));
+        OAuthProvider p = findProvider(provider);
+        String state = buildState(Map.of(
+                "mode", "bind", "tid", String.valueOf(tenantId),
+                "p", provider, "uid", String.valueOf(userId)));
+        return p.buildAuthorizeUrl(cfg, requireRedirectUri(cfg), state);
+    }
+
+    /**
+     * 处理回调：校验 state → 换 token → 拉用户 → 按 mode 分支（登录 / 绑定）
      */
     @Transactional
-    public TokenResponse handleCallback(String provider, String code, String state) {
+    public OAuthCallbackResult handleCallback(String provider, String code, String state) {
         // 1. 校验 state（取出后删除，一次性）
         Object raw = redisTemplate.opsForValue().get(STATE_PREFIX + state);
         if (raw == null) {
@@ -108,33 +116,40 @@ public class OAuthLoginService {
         if (!provider.equals(sv.get("p"))) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "OAuth state 不匹配");
         }
-        String tenantUid = sv.get("t");
-        String method = "oauth:" + provider;
+        String mode = sv.getOrDefault("mode", "login");
+        Long tenantId = parseLong(sv.get("tid"));
+        if (tenantId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "OAuth state 无效");
+        }
 
-        Tenant tenant = tenantService.getTenantByUid(tenantUid);
+        Tenant tenant = tenantService.getTenantById(tenantId);
         if (tenant == null || !tenant.isValid()) {
             throw new BusinessException(ErrorCode.INVALID_TENANT);
         }
-        Long tenantId = tenant.getId();
+        String method = "oauth:" + provider;
         if (!loginMethodConfigService.isEnabled(tenantId, method)) {
             throw new BusinessException(ErrorCode.LOGIN_METHOD_DISABLED, "该登录方式未启用");
         }
 
         Map<String, String> cfg = parseConfig(loginMethodConfigService.getEffectiveConfig(tenantId, method));
-        String redirectUri = cfg.get("redirectUri");
-        if (redirectUri == null || redirectUri.isBlank()) {
-            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri（回调地址）");
-        }
         OAuthProvider p = findProvider(provider);
 
         // 2. 换 token + 拉用户
-        String accessToken = p.exchangeAccessToken(code, cfg, redirectUri);
+        String accessToken = p.exchangeAccessToken(code, cfg, requireRedirectUri(cfg));
         OAuthUserInfo info = p.fetchUser(accessToken, cfg);
         if (info.getProviderUid() == null || info.getProviderUid().isBlank()) {
             throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, provider + " 未返回用户唯一标识");
         }
 
-        // 3. 匹配本地绑定
+        // 3. 按 mode 分支
+        if ("bind".equals(mode)) {
+            return handleBind(tenantId, provider, info, sv.get("uid"));
+        }
+        return handleLogin(tenantId, provider, info);
+    }
+
+    /** 登录分支：匹配已有绑定，否则建新用户，签发 token */
+    private OAuthCallbackResult handleLogin(Long tenantId, String provider, OAuthUserInfo info) {
         UserOauth binding = userOauthMapper.findByTenantProviderUid(tenantId, provider, info.getProviderUid());
         User user;
         if (binding != null) {
@@ -145,14 +160,78 @@ public class OAuthLoginService {
         } else {
             user = createOAuthUser(tenantId, provider, info);
         }
-
         if (user.getStatus() == 0) {
             throw new BusinessException(ErrorCode.USER_DISABLED);
         }
         user.setLastLoginAt(LocalDateTime.now());
         userMapper.update(user);
         log.info("OAuth login success: tenant={}, provider={}, user={}", tenantId, provider, user.getId());
-        return issueTokens(user);
+        return OAuthCallbackResult.builder().login(true).token(issueTokens(user)).build();
+    }
+
+    /** 绑定分支：把第三方账号绑到当前本地用户，含冲突检查 */
+    private OAuthCallbackResult handleBind(Long tenantId, String provider, OAuthUserInfo info, String uidStr) {
+        Long userId = parseLong(uidStr);
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "绑定 state 缺少用户标识");
+        }
+        // 该第三方账号是否已绑到别的本地账号
+        UserOauth occupied = userOauthMapper.findByTenantProviderUid(tenantId, provider, info.getProviderUid());
+        if (occupied != null) {
+            if (occupied.getUserId().equals(userId)) {
+                return OAuthCallbackResult.builder().login(false).success(true).message("该账号已绑定此平台").build();
+            }
+            return OAuthCallbackResult.builder().login(false).success(false)
+                    .message("该 " + provider + " 账号已绑定到其他本地账号，无法重复绑定").build();
+        }
+        // 当前用户是否已绑该 provider（并发兜底）
+        if (userOauthMapper.findByTenantUserProvider(tenantId, userId, provider) != null) {
+            return OAuthCallbackResult.builder().login(false).success(false).message("你已绑定该平台，无需重复绑定").build();
+        }
+        userOauthMapper.insert(UserOauth.builder()
+                .tenantId(tenantId).userId(userId).provider(provider).providerUid(info.getProviderUid()).build());
+        log.info("OAuth bind success: tenant={}, user={}, provider={}", tenantId, userId, provider);
+        return OAuthCallbackResult.builder().login(false).success(true).message("绑定成功").build();
+    }
+
+    /** 列出当前用户已绑定的第三方平台 */
+    public List<UserOauth> listBindings(Long tenantId, Long userId) {
+        return userOauthMapper.findByTenantUserId(tenantId, userId);
+    }
+
+    /** 解绑某第三方平台 */
+    public void unbind(Long tenantId, Long userId, String provider) {
+        int n = userOauthMapper.deleteByTenantUserProvider(tenantId, userId, provider);
+        if (n == 0) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "未绑定该平台");
+        }
+        log.info("OAuth unbind: tenant={}, user={}, provider={}", tenantId, userId, provider);
+    }
+
+    /** 生成 state 并存 Redis，返回 state 字符串 */
+    private String buildState(Map<String, String> payload) {
+        String state = UUID.randomUUID().toString().replace("-", "");
+        String value;
+        try {
+            value = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OAuth state 序列化失败");
+        }
+        redisTemplate.opsForValue().set(STATE_PREFIX + state, value, STATE_TTL_SECONDS, TimeUnit.SECONDS);
+        return state;
+    }
+
+    private String requireRedirectUri(Map<String, String> cfg) {
+        String redirectUri = cfg.get("redirectUri");
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID, "未配置 redirectUri（回调地址）");
+        }
+        return redirectUri;
+    }
+
+    private static Long parseLong(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Long.valueOf(s); } catch (Exception e) { return null; }
     }
 
     /**

@@ -147,13 +147,13 @@
     }
 
     // Pages that can be stored in the URL hash
-    const VALID_PAGES = ['dashboard', 'users', 'roles', 'permissions', 'tenants', 'login-methods'];
+    const VALID_PAGES = ['dashboard', 'users', 'roles', 'permissions', 'tenants', 'login-methods', 'bindings'];
 
     /**
      * Read target page from URL hash, fall back to dashboard
      */
     function getPageFromHash() {
-        const hash = (window.location.hash || '').replace('#', '');
+        const hash = (window.location.hash || '').replace('#', '').split('&')[0];
         return VALID_PAGES.includes(hash) ? hash : 'dashboard';
     }
 
@@ -230,6 +230,9 @@
                 break;
             case 'login-methods':
                 await loadLoginMethods();
+                break;
+            case 'bindings':
+                await loadBindings();
                 break;
         }
 
@@ -1386,6 +1389,69 @@
         }
     }
 
+    // ========== Bindings（账号绑定） ==========
+    const OAUTH_PROVIDERS = [
+        { key: 'gitee', name: 'Gitee' },
+        { key: 'microsoft', name: 'Microsoft' },
+        { key: 'github', name: 'GitHub' }
+    ];
+
+    async function loadBindings() {
+        try {
+            const bindings = await API.LoginMethods.listMyBindings();
+            renderBindings(bindings || []);
+        } catch (error) {
+            Toast.error('加载绑定列表失败: ' + error.message);
+        }
+        // 绑定回调 fragment 提示（#bindings&bind=success/failed&msg=xxx）
+        if (window.location.hash.indexOf('bind=') !== -1) {
+            const params = new URLSearchParams(window.location.hash.split('&').slice(1).join('&'));
+            const result = params.get('bind');
+            const msg = params.get('msg');
+            if (result === 'success') Toast.success(msg || '绑定成功');
+            else if (result === 'failed') Toast.error(msg || '绑定失败');
+            window.location.hash = '#bindings';
+        }
+    }
+
+    function renderBindings(bindings) {
+        const tbody = document.getElementById('bindingsTableBody');
+        const boundMap = {};
+        bindings.forEach(b => { boundMap[b.provider] = b; });
+        tbody.innerHTML = OAUTH_PROVIDERS.map(p => {
+            const bound = boundMap[p.key];
+            const status = bound
+                ? '<span class="badge badge-success">已绑定</span>'
+                : '<span class="badge badge-warning">未绑定</span>';
+            const action = bound
+                ? `<button class="btn btn-sm btn-danger" onclick='App.unbindBinding(${quoteJsString(p.key)})'>解绑</button>`
+                : `<button class="btn btn-sm btn-primary" onclick='App.bindProvider(${quoteJsString(p.key)})'>绑定</button>`;
+            return `
+                <tr>
+                    <td>${escapeHtml(p.name)}</td>
+                    <td>${bound ? escapeHtml(bound.providerUid) : '-'}</td>
+                    <td>${status}</td>
+                    <td><div class="action-buttons">${action}</div></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function bindProvider(provider) {
+        window.location.href = '/api/auth/oauth/' + encodeURIComponent(provider) + '/bind';
+    }
+
+    async function unbindBinding(provider) {
+        if (!confirm('确定解绑 ' + provider + '？解绑后该第三方账号将无法用于登录本账号。')) return;
+        try {
+            await API.LoginMethods.unbind(provider);
+            Toast.success('解绑成功');
+            await loadBindings();
+        } catch (error) {
+            Toast.error('解绑失败: ' + error.message);
+        }
+    }
+
     // ========== Public API ==========
     window.App = {
         editUser,
@@ -1399,7 +1465,9 @@
         deletePermission,
         editTenant,
         deleteTenant,
-        editLoginMethod
+        editLoginMethod,
+        bindProvider,
+        unbindBinding
     };
 
     // Also expose Toast globally

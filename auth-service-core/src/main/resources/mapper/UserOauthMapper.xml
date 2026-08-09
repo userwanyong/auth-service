@@ -25,4 +25,22 @@
         VALUES (#{tenantId}, #{userId}, #{provider}, #{providerUid})
     </insert>
 
+    <select id="findByTenantUserId" resultMap="UserOauthResultMap">
+        SELECT id, tenant_id, user_id, provider, provider_uid, created_at, updated_at
+        FROM user_oauth
+        WHERE tenant_id = #{tenantId} AND user_id = #{userId}
+        ORDER BY provider
+    </select>
+
+    <select id="findByTenantUserProvider" resultMap="UserOauthResultMap">
+        SELECT id, tenant_id, user_id, provider, provider_uid, created_at, updated_at
+        FROM user_oauth
+        WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND provider = #{provider}
+    </select>
+
+    <delete id="deleteByTenantUserProvider">
+        DELETE FROM user_oauth
+        WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND provider = #{provider}
+    </delete>
+
 </mapper>
