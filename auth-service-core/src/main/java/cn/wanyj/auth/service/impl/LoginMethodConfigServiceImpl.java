@@ -47,6 +47,10 @@ public class LoginMethodConfigServiceImpl implements LoginMethodConfigService {
         if (method == null) {
             return false;
         }
+        // 平台租户（tenant_id=0）是系统管理租户，仅允许账号密码登录，其他方式一律禁用
+        if (tenantId != null && tenantId.equals(0L) && !LoginMethod.PASSWORD.getCode().equals(method)) {
+            return false;
+        }
         // 平台级开关（password 平台恒开）
         boolean platformEnabled = LoginMethod.PASSWORD.getCode().equals(method) || isPlatformRowEnabled(method);
         if (!platformEnabled) {
