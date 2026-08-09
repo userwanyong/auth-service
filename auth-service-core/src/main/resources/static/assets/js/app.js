@@ -36,6 +36,7 @@
         // 立即（同步）切换到 URL hash 指定的页面，避免刷新时先闪现仪表盘再跳转。
         // 权限判断先用 localStorage 中上次缓存的用户信息（fetch 之前即可读取）。
         const targetPage = getPageFromHash();
+        captureBindResult(); // 在 switchPageView 规范化 hash 前捕获绑定回调结果
         switchPageView(targetPage);
 
         // Fetch current user info
@@ -1390,6 +1391,14 @@
     }
 
     // ========== Bindings（账号绑定） ==========
+    let pendingBindResult = null;
+    /** 在 switchPageView 规范化 hash 前捕获绑定回调结果（#bindings&bind=success/failed&msg=xxx） */
+    function captureBindResult() {
+        if (window.location.hash.indexOf('bind=') !== -1) {
+            const params = new URLSearchParams(window.location.hash.split('&').slice(1).join('&'));
+            pendingBindResult = { result: params.get('bind'), msg: params.get('msg') };
+        }
+    }
     const OAUTH_PROVIDERS = [
         { key: 'gitee', name: 'Gitee' },
         { key: 'microsoft', name: 'Microsoft' },
@@ -1403,14 +1412,11 @@
         } catch (error) {
             Toast.error('加载绑定列表失败: ' + error.message);
         }
-        // 绑定回调 fragment 提示（#bindings&bind=success/failed&msg=xxx）
-        if (window.location.hash.indexOf('bind=') !== -1) {
-            const params = new URLSearchParams(window.location.hash.split('&').slice(1).join('&'));
-            const result = params.get('bind');
-            const msg = params.get('msg');
-            if (result === 'success') Toast.success(msg || '绑定成功');
-            else if (result === 'failed') Toast.error(msg || '绑定失败');
-            window.location.hash = '#bindings';
+        // 绑定回调结果（init 早期捕获，因为 switchPageView 会把 hash 规范化成 #bindings 丢掉 &bind=）
+        if (pendingBindResult) {
+            if (pendingBindResult.result === 'success') Toast.success(pendingBindResult.msg || '绑定成功');
+            else if (pendingBindResult.result === 'failed') Toast.error(pendingBindResult.msg || '绑定失败');
+            pendingBindResult = null;
         }
     }
 
