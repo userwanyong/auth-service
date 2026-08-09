@@ -32,12 +32,14 @@
             return;
         }
 
-        // Fetch current user info first
+        // 立即（同步）切换到 URL hash 指定的页面，避免刷新时先闪现仪表盘再跳转。
+        // 权限判断先用 localStorage 中上次缓存的用户信息（fetch 之前即可读取）。
+        const targetPage = getPageFromHash();
+        switchPageView(targetPage);
+
+        // Fetch current user info
         try {
             const userResponse = await API.Auth.getCurrentUser();
-            console.log('Current user response:', userResponse);
-            console.log('User tenantId:', userResponse.tenantId);
-            console.log('Is platform tenant:', isPlatformTenantId(userResponse.tenantId));
             localStorage.setItem('auth_user', JSON.stringify(userResponse));
         } catch (error) {
             console.error('Failed to fetch user info:', error);
@@ -52,6 +54,12 @@
 
         // Show/hide platform admin features
         updatePlatformFeatures();
+
+        // 用户信息刷新后，若租户类型与缓存不一致导致页面归属变化，重新校正显示
+        const correctedPage = resolveAccessiblePage(targetPage);
+        if (correctedPage !== currentPage) {
+            switchPageView(correctedPage);
+        }
 
         // Setup navigation
         setupNavigation();
@@ -68,8 +76,8 @@
         // Setup hash-based routing (so refresh / browser back-forward restores the page)
         setupHashRouting();
 
-        // Load initial page from URL hash (default: dashboard)
-        navigateTo(getPageFromHash());
+        // Load current page data
+        await loadPageData(currentPage);
     }
 
     /**
@@ -157,26 +165,30 @@
     }
 
     /**
-     * Navigate to page
+     * 根据当前租户类型校正目标页面：
+     * 平台租户只能看仪表盘/租户管理；普通租户不能看租户管理。
      */
-    async function navigateTo(page) {
-        // Guard: restrict accessible pages by tenant type
+    function resolveAccessiblePage(page) {
         const isPlatform = Auth.isPlatformTenant();
         if (isPlatform && ['users', 'roles', 'permissions'].includes(page)) {
-            page = 'dashboard';
-        } else if (!isPlatform && page === 'tenants') {
-            page = 'dashboard';
+            return 'dashboard';
         }
+        if (!isPlatform && page === 'tenants') {
+            return 'dashboard';
+        }
+        return page;
+    }
 
-        // Update nav links
+    /**
+     * 同步切换页面显示（DOM 高亮、nav active、URL hash），无网络 IO。
+     * 在 init 最早期调用，避免刷新时先闪现仪表盘再跳到目标页面。
+     */
+    function switchPageView(page) {
+        page = resolveAccessiblePage(page);
+
         document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('data-page') === page) {
-                link.classList.add('active');
-            }
+            link.classList.toggle('active', link.getAttribute('data-page') === page);
         });
-
-        // Show page
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const pageElement = document.getElementById(`page-${page}`);
         if (pageElement) {
@@ -190,8 +202,10 @@
         if (window.location.hash !== targetHash) {
             history.replaceState(null, '', targetHash);
         }
+    }
 
-        // Load page data
+    /** 加载当前页面数据，并在移动端收起侧栏 */
+    async function loadPageData(page) {
         switch (page) {
             case 'dashboard':
                 await loadDashboard();
@@ -214,6 +228,14 @@
         if (window.innerWidth <= 768) {
             document.getElementById('sidebar').classList.remove('active');
         }
+    }
+
+    /**
+     * Navigate to page
+     */
+    async function navigateTo(page) {
+        switchPageView(page);
+        await loadPageData(currentPage);
     }
 
     /**
