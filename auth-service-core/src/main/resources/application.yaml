@@ -48,6 +48,11 @@ jwt:
   access-token-expiration: 900000    # 15 minutes (milliseconds)
   refresh-token-expiration: 604800000 # 7 days (milliseconds)
 
+# Login method credential encryption (AES Base64 key; generate with: openssl rand -base64 32)
+# Used to encrypt login_method_config.config_json (email/sms/oauth credentials)
+login-config:
+  aes-key: ${LOGIN_CONFIG_AES_KEY:}
+
 # Login Rate Limiting
 auth:
   rate-limit:

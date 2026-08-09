@@ -47,6 +47,12 @@
                             <span class="nav-text">租户管理</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="#login-methods" class="nav-link" data-page="login-methods">
+                            <span class="nav-icon">🔑</span>
+                            <span class="nav-text">登录方式</span>
+                        </a>
+                    </li>
                 </ul>
             </nav>
             <div class="sidebar-footer">
@@ -452,6 +458,70 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" data-close="permissionModal">取消</button>
                 <button class="btn btn-primary" id="permissionSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Methods Page -->
+    <section class="page" id="page-login-methods">
+        <div class="page-header">
+            <h1 id="loginMethodsTitle">登录方式配置</h1>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>登录方式</th>
+                        <th>类别</th>
+                        <th>状态</th>
+                        <th>凭证</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="loginMethodsTableBody">
+                    <tr><td colspan="5" class="text-center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="loginMethodsHint" class="form-text" style="padding:12px 0;"></div>
+    </section>
+
+    <!-- Login Method Modal -->
+    <div class="modal" id="loginMethodModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="loginMethodModalTitle">配置登录方式</h3>
+                <button class="modal-close" data-close="loginMethodModal">&times;</button>
+            </div>
+            <form class="modal-body" id="loginMethodForm">
+                <input type="hidden" id="loginMethodCode">
+                <div class="form-group">
+                    <label>登录方式</label>
+                    <input type="text" class="form-control" id="loginMethodDisplay" disabled>
+                </div>
+                <div class="form-group">
+                    <label>状态</label>
+                    <select class="form-control" id="loginMethodEnabled">
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+                <div class="form-group" id="loginMethodUsePlatformGroup" style="display:none;">
+                    <label>凭证来源</label>
+                    <select class="form-control" id="loginMethodUsePlatform">
+                        <option value="1">使用平台默认凭证</option>
+                        <option value="0">使用本租户自有凭证</option>
+                    </select>
+                </div>
+                <div class="form-group" id="loginMethodConfigGroup">
+                    <label>凭证配置（JSON，留空表示不修改）</label>
+                    <textarea class="form-control" id="loginMethodConfigJson" rows="6" placeholder='{"clientId":"...","clientSecret":"..."}'></textarea>
+                    <small class="form-text" id="loginMethodConfigHint"></small>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="loginMethodModal">取消</button>
+                <button class="btn btn-primary" id="loginMethodSaveBtn">保存</button>
             </div>
         </div>
     </div>

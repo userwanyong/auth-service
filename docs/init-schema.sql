@@ -162,6 +162,28 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审计日志表';
 
 -- ============================================
+-- Table: login_method_config (登录方式配置表 - 平台级+租户级二级开关)
+-- tenant_id=0 为平台级默认开关与凭证；其他为租户级开关（可在平台允许范围内覆盖凭证）
+-- ============================================
+CREATE TABLE IF NOT EXISTS `login_method_config` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `tenant_id` BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID（0=平台级默认配置）',
+  `method` VARCHAR(32) NOT NULL COMMENT '登录方式：password/email:aliyun/sms:aliyun/oauth:gitee/oauth:microsoft/oauth:github',
+  `enabled` TINYINT NOT NULL DEFAULT 0 COMMENT '是否启用：0-否，1-是',
+  `use_platform_config` TINYINT NOT NULL DEFAULT 1 COMMENT '仅租户行有效：1=用平台默认凭证，0=用自身config_json',
+  `config_json` TEXT COMMENT '该方式的凭证配置（整段AES加密密文，结构因method而异）',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_method` (`tenant_id`, `method`),
+  KEY `idx_tenant_id` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录方式配置表';
+
+-- 初始数据：password 平台级恒开（平台不可关闭，保证不锁死）
+INSERT INTO `login_method_config` (`tenant_id`, `method`, `enabled`, `use_platform_config`, `config_json`) VALUES
+(0, 'password', 1, 1, NULL) ON DUPLICATE KEY UPDATE `enabled` = 1;
+
+-- ============================================
 -- Initial Data (初始数据)
 -- ============================================
 -- 注意：如需重新初始化，请先手动清空相关表数据

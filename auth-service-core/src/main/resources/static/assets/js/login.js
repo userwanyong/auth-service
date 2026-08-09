@@ -100,6 +100,52 @@
             const fallbackOption = '<option value="1">默认租户</option>';
             loginTenantSelect.insertAdjacentHTML('beforeend', fallbackOption);
         }
+
+        // 选租户后加载该租户对用户开放的登录方式（用于动态渲染社交登录入口）
+        loginTenantSelect.addEventListener('change', () => {
+            loadEnabledLoginMethods(loginTenantSelect.value);
+        });
+        if (loginTenantSelect.value) {
+            loadEnabledLoginMethods(loginTenantSelect.value);
+        }
+    }
+
+    /**
+     * 按租户标识拉取该租户对用户开放的登录方式，渲染社交登录按钮
+     * 阶段0：仅渲染 oauth:* 方式占位（点击提示后续上线）；邮箱/短信完整交互在阶段1
+     */
+    async function loadEnabledLoginMethods(tenantUid) {
+        const container = document.getElementById('socialLoginMethods');
+        const divider = document.getElementById('loginDivider');
+        if (!container || !divider) return;
+        if (!tenantUid) {
+            divider.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        try {
+            const methods = await API.LoginMethods.getEnabled(tenantUid);
+            const oauthMethods = (methods || []).filter(m => m.startsWith('oauth:'));
+            if (oauthMethods.length) {
+                divider.style.display = '';
+                container.innerHTML = oauthMethods.map(m => {
+                    const name = (m.split(':')[1] || '').toUpperCase();
+                    return `<button type="button" class="btn-social" data-method="${escapeHtml(m)}">${escapeHtml(name)} 登录</button>`;
+                }).join('');
+                container.querySelectorAll('.btn-social').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        Toast.info('该登录方式将在后续阶段上线');
+                    });
+                });
+            } else {
+                divider.style.display = 'none';
+                container.innerHTML = '';
+            }
+        } catch (error) {
+            console.error('Failed to load enabled login methods', error);
+            divider.style.display = 'none';
+            container.innerHTML = '';
+        }
     }
 
     /**

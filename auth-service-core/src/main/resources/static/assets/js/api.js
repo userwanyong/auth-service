@@ -393,6 +393,24 @@ const API = (function() {
         }
     };
 
+    // ========== Login Methods API（平台级 + 租户级二级开关） ==========
+    const LoginMethodsAPI = {
+        /** 平台级：列出所有登录方式及平台总开关/默认凭证配置状态（平台管理员） */
+        listPlatform: () => get('/platform/login-methods'),
+
+        /** 平台级：保存某方式的开关与默认凭证 */
+        savePlatform: (method, data) => put(`/platform/login-methods/${method}`, data),
+
+        /** 租户级：列出本租户可配置的登录方式（平台已开启的子集）及本租户开关/凭证来源 */
+        listTenant: () => get('/tenant/login-methods'),
+
+        /** 租户级：保存本租户某方式的开关与凭证来源 */
+        saveTenant: (method, data) => put(`/tenant/login-methods/${method}`, data),
+
+        /** 公开：按对外租户标识查询该租户对用户开放的登录方式列表（登录页动态渲染用） */
+        getEnabled: (tenantUid) => get('/auth/login-methods', { tenantUid })
+    };
+
     // Public API
     return {
         Auth: AuthAPI,
@@ -400,6 +418,7 @@ const API = (function() {
         Roles: RolesAPI,
         Permissions: PermissionsAPI,
         Tenants: TenantsAPI,
-        Upload: UploadAPI
+        Upload: UploadAPI,
+        LoginMethods: LoginMethodsAPI
     };
 })();

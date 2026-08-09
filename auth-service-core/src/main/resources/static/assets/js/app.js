@@ -147,7 +147,7 @@
     }
 
     // Pages that can be stored in the URL hash
-    const VALID_PAGES = ['dashboard', 'users', 'roles', 'permissions', 'tenants'];
+    const VALID_PAGES = ['dashboard', 'users', 'roles', 'permissions', 'tenants', 'login-methods'];
 
     /**
      * Read target page from URL hash, fall back to dashboard
@@ -227,6 +227,9 @@
                 break;
             case 'tenants':
                 await loadTenants();
+                break;
+            case 'login-methods':
+                await loadLoginMethods();
                 break;
         }
 
@@ -310,6 +313,8 @@
         setupPermissionModal();
         // Tenant modal
         setupTenantModal();
+        // Login method modal
+        setupLoginMethodModal();
     }
 
     function openModal(modalId) {
@@ -1157,6 +1162,134 @@
         }
     };
 
+    // ========== Login Methods ==========
+    let loginMethodsData = [];
+    // 'platform' = 平台租户看到的平台级总开关/默认凭证；'tenant' = 普通租户看到的本租户开关/凭证来源
+    let loginMethodsScope = 'tenant';
+
+    async function loadLoginMethods() {
+        loginMethodsScope = Auth.isPlatformTenant() ? 'platform' : 'tenant';
+        const titleEl = document.getElementById('loginMethodsTitle');
+        const hintEl = document.getElementById('loginMethodsHint');
+        if (loginMethodsScope === 'platform') {
+            titleEl.textContent = '平台登录方式配置（全局总开关与默认凭证）';
+            hintEl.textContent = '平台开启的方式，各租户才能在自身范围内开启。password 平台级锁定不可关闭。';
+        } else {
+            titleEl.textContent = '本租户登录方式配置';
+            hintEl.textContent = '只能开启平台已允许的方式；可选择使用平台默认凭证或本租户自有凭证。';
+        }
+        try {
+            loginMethodsData = loginMethodsScope === 'platform'
+                ? await API.LoginMethods.listPlatform()
+                : await API.LoginMethods.listTenant();
+            renderLoginMethodsTable();
+        } catch (error) {
+            Toast.error('加载登录方式失败: ' + error.message);
+        }
+    }
+
+    function renderLoginMethodsTable() {
+        const tbody = document.getElementById('loginMethodsTableBody');
+        if (!loginMethodsData.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无数据</td></tr>';
+            return;
+        }
+        tbody.innerHTML = loginMethodsData.map(m => {
+            const enabledBadge = m.enabled === 1
+                ? '<span class="badge badge-success">启用</span>'
+                : '<span class="badge badge-danger">禁用</span>';
+            const configBadge = m.hasConfig
+                ? '<span class="badge badge-info">已配置</span>'
+                : '<span class="badge badge-warning">未配置</span>';
+            let credCell;
+            if (loginMethodsScope === 'platform') {
+                credCell = configBadge;
+            } else {
+                const source = m.usePlatformConfig === 1 ? '平台默认' : '本租户自有';
+                credCell = `${source} ${configBadge}`;
+            }
+            const locked = m.platformLocked === true;
+            const actionBtn = locked
+                ? '<span class="form-text" style="display:inline;">平台锁定</span>'
+                : `<button class="btn btn-sm btn-outline" onclick='App.editLoginMethod(${quoteJsString(m.method)})'>配置</button>`;
+            return `
+                <tr>
+                    <td>${escapeHtml(m.displayName)}</td>
+                    <td>${escapeHtml(m.category)}</td>
+                    <td>${enabledBadge}</td>
+                    <td>${credCell}</td>
+                    <td><div class="action-buttons">${actionBtn}</div></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function editLoginMethod(method) {
+        const m = loginMethodsData.find(x => x.method === method);
+        if (!m) return;
+        openLoginMethodModal(m);
+    }
+
+    function openLoginMethodModal(m) {
+        document.getElementById('loginMethodCode').value = m.method;
+        document.getElementById('loginMethodDisplay').value = `${m.displayName} (${m.category})`;
+        const enabledSel = document.getElementById('loginMethodEnabled');
+        enabledSel.value = String(m.enabled ?? 0);
+        enabledSel.disabled = m.platformLocked === true; // password 平台锁定
+        const usePlatformGroup = document.getElementById('loginMethodUsePlatformGroup');
+        const configHint = document.getElementById('loginMethodConfigHint');
+        if (loginMethodsScope === 'tenant') {
+            usePlatformGroup.style.display = '';
+            document.getElementById('loginMethodUsePlatform').value = String(m.usePlatformConfig ?? 1);
+            configHint.textContent = '选择“使用本租户自有凭证”后填写下方 JSON（留空表示不修改）。';
+        } else {
+            usePlatformGroup.style.display = 'none';
+            configHint.textContent = '填写该方式的默认凭证 JSON（留空表示不修改）。password 无需凭证。';
+        }
+        document.getElementById('loginMethodConfigJson').value = '';
+        openModal('loginMethodModal');
+    }
+
+    function setupLoginMethodModal() {
+        const saveBtn = document.getElementById('loginMethodSaveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                await saveLoginMethod();
+            });
+        }
+    }
+
+    async function saveLoginMethod() {
+        const method = document.getElementById('loginMethodCode').value;
+        const enabled = parseInt(document.getElementById('loginMethodEnabled').value);
+        const configJson = document.getElementById('loginMethodConfigJson').value.trim();
+        const data = { enabled };
+        if (loginMethodsScope === 'tenant') {
+            data.usePlatformConfig = parseInt(document.getElementById('loginMethodUsePlatform').value);
+        }
+        if (configJson) {
+            try {
+                JSON.parse(configJson);
+            } catch (e) {
+                Toast.error('凭证 JSON 格式不合法: ' + e.message);
+                return;
+            }
+            data.configJson = configJson;
+        }
+        try {
+            if (loginMethodsScope === 'platform') {
+                await API.LoginMethods.savePlatform(method, data);
+            } else {
+                await API.LoginMethods.saveTenant(method, data);
+            }
+            Toast.success('保存成功');
+            closeModal('loginMethodModal');
+            await loadLoginMethods();
+        } catch (error) {
+            Toast.error('保存失败: ' + error.message);
+        }
+    }
+
     // ========== Public API ==========
     window.App = {
         editUser,
@@ -1169,7 +1302,8 @@
         rolePermissions,
         deletePermission,
         editTenant,
-        deleteTenant
+        deleteTenant,
+        editLoginMethod
     };
 
     // Also expose Toast globally

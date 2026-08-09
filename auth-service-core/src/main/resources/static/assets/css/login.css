@@ -289,3 +289,57 @@ select.form-control {
         min-width: auto;
     }
 }
+
+/* ===================================
+   Social / alternative login methods
+   =================================== */
+.login-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    padding: 0 32px;
+    margin: 4px 0 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.login-divider::before {
+    margin-right: 12px;
+}
+
+.login-divider::after {
+    margin-left: 12px;
+}
+
+.social-login {
+    padding: 0 32px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn-social {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background: #ffffff;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-social:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: translateY(-1px);
+}
