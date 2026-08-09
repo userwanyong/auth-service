@@ -1192,12 +1192,6 @@
             { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
             { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://localhost:8123/api/auth/oauth/gitee/callback' }
         ],
-        'oauth:microsoft': [
-            { key: 'clientId', label: '应用(客户端) ID', type: 'text', required: true },
-            { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
-            { key: 'redirectUri', label: '回调地址 redirectUri', type: 'text', required: true, placeholder: 'http://localhost:8123/api/auth/oauth/microsoft/callback' },
-            { key: 'tenant', label: '租户 tenant', type: 'text', required: false, placeholder: 'common 或你的租户ID', default: 'common' }
-        ],
         'oauth:github': [
             { key: 'clientId', label: 'Client ID', type: 'text', required: true },
             { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },

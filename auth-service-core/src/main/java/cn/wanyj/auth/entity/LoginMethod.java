@@ -18,7 +18,6 @@ public enum LoginMethod {
     EMAIL_ALIYUN("email:aliyun", "email", "邮箱验证码（阿里云）"),
     SMS_ALIYUN("sms:aliyun", "sms", "手机验证码（阿里云）"),
     OAUTH_GITEE("oauth:gitee", "oauth", "Gitee 登录"),
-    OAUTH_MICROSOFT("oauth:microsoft", "oauth", "Microsoft 账号"),
     OAUTH_GITHUB("oauth:github", "oauth", "GitHub 登录");
 
     private final String code;
