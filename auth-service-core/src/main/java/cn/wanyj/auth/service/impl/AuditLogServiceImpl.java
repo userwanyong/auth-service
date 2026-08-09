@@ -25,7 +25,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     public void log(Long tenantId, Long userId, String username, String action, String resource, String detail, String ipAddress) {
         try {
             AuditLog auditLog = AuditLog.builder()
-                    .tenantId(tenantId)
+                    .tenantId(tenantId != null ? tenantId : 0L)
                     .userId(userId)
                     .username(username)
                     .action(action)

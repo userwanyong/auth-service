@@ -1,6 +1,7 @@
 package cn.wanyj.auth.aspect;
 
 import cn.wanyj.auth.annotation.Auditable;
+import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.filter.RpcAuthFilter;
 import cn.wanyj.auth.security.JwtTokenProvider;
 import cn.wanyj.auth.security.SecurityUtils;
@@ -33,8 +34,8 @@ public class AuditAspect {
     private final AuditLogService auditLogService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @AfterReturning("@annotation(auditable)")
-    public void afterReturning(JoinPoint joinPoint, Auditable auditable) {
+    @AfterReturning(pointcut = "@annotation(auditable)", returning = "result")
+    public void afterReturning(JoinPoint joinPoint, Auditable auditable, Object result) {
         try {
             Long userId = SecurityUtils.getCurrentUserId();
             Long tenantId = SecurityUtils.getCurrentTenantId();
@@ -106,6 +107,23 @@ public class AuditAspect {
                                 // token 可能已过期或无效，跳过
                             }
                         }
+                    }
+                }
+            }
+
+            // 4. 从返回值提取（login/register/loginByCode 返回 TokenResponse，含 user.tenantId/userId/username）
+            //    覆盖 login 这类公开端点：请求时 SecurityContext 无认证信息，需从返回值补全
+            if (result instanceof TokenResponse) {
+                TokenResponse.UserInfo u = ((TokenResponse) result).getUser();
+                if (u != null) {
+                    if (tenantId == null && u.getTenantId() != null) {
+                        tenantId = u.getTenantId();
+                    }
+                    if (userId == null && u.getId() != null) {
+                        userId = u.getId();
+                    }
+                    if ((username == null || username.isBlank()) && u.getUsername() != null) {
+                        username = u.getUsername();
                     }
                 }
             }
