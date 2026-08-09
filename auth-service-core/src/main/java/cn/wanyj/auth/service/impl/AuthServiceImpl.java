@@ -237,8 +237,8 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
 
-        // Load user with roles and permissions
-        User user = userMapper.findByIdWithRoles(userId);
+        // Load user with roles (enforce tenant isolation with token's tenantId)
+        User user = userMapper.findByIdWithRoles(userId, tenantId);
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }

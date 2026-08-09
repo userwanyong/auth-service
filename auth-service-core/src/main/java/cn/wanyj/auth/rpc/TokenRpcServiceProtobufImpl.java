@@ -40,7 +40,8 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
 
-            User user = userMapper.findByIdWithRoles(userId);
+            // tenantId > 0 时强制租户隔离；=0 保持原"不指定租户"语义
+            User user = userMapper.findByIdWithRoles(userId, tenantId > 0 ? tenantId : null);
             if (user == null) {
                 log.error("User not found: {}", userId);
                 return TokenRpcResponse.getDefaultInstance();

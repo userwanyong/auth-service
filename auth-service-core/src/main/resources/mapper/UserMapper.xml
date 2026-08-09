@@ -262,6 +262,9 @@
         LEFT JOIN user_role ur ON u.id = ur.user_id AND u.tenant_id = ur.tenant_id
         LEFT JOIN role r ON ur.role_id = r.id AND ur.tenant_id = r.tenant_id
         WHERE u.id = #{id}
+        <if test="tenantId != null">
+            AND u.tenant_id = #{tenantId}
+        </if>
     </select>
 
     <!-- Find By Id With Roles And Permissions -->

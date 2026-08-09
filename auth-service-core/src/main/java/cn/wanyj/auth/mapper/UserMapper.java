@@ -112,10 +112,10 @@ public interface UserMapper {
     int deleteById(@Param("id") Long id);
 
     /**
-     * Find user with roles by id
-     * 查找用户及其角色信息
+     * Find user with roles by id (and optionally tenant id)
+     * 查找用户及其角色信息（tenantId 非 null 时强制租户隔离）
      */
-    User findByIdWithRoles(@Param("id") Long id);
+    User findByIdWithRoles(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /**
      * Find user with roles and permissions by id and tenant id
