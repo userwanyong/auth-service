@@ -154,8 +154,10 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    <th>头像</th>
                                     <th>用户名</th>
                                     <th>邮箱</th>
+                                    <th>手机号</th>
                                     <th>昵称</th>
                                     <th>状态</th>
                                     <th>当前角色</th>
@@ -163,7 +165,7 @@
                                 </tr>
                             </thead>
                             <tbody id="usersTableBody">
-                                <tr><td colspan="7" class="text-center">加载中...</td></tr>
+                                <tr><td colspan="9" class="text-center">加载中...</td></tr>
                             </tbody>
                         </table>
                         <div class="pagination" id="usersPagination"></div>
@@ -260,14 +262,25 @@
             </div>
             <form class="modal-body" id="userForm">
                 <input type="hidden" id="userId">
+                <input type="hidden" id="userAvatar">
                 <div class="form-group">
-                    <label>用户名 *</label>
+                    <label>头像</label>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <img id="userAvatarPreview" src="" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:#f0f0f0;display:none;">
+                        <div>
+                            <input type="file" class="form-control" id="userAvatarFile" accept="image/jpeg,image/png,image/gif,image/webp">
+                            <small class="form-text">jpg/png/gif/webp，最大 2MB，上传到阿里 OSS</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>用户名 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="userUsername" required>
                 </div>
                 <div class="form-group">
-                    <label>密码</label>
+                    <label id="userPasswordLabel">密码</label>
                     <input type="password" class="form-control" id="userPassword">
-                    <small class="form-text">编辑时留空则不修改密码</small>
+                    <small class="form-text" id="userPasswordHint">编辑时留空则不修改密码</small>
                 </div>
                 <div class="form-group">
                     <label>邮箱</label>
@@ -276,6 +289,26 @@
                 <div class="form-group">
                     <label>昵称</label>
                     <input type="text" class="form-control" id="userNickname">
+                </div>
+                <div class="form-group">
+                    <label>手机号</label>
+                    <input type="tel" class="form-control" id="userPhone" placeholder="11位手机号">
+                </div>
+                <div class="form-group">
+                    <label>真实姓名</label>
+                    <input type="text" class="form-control" id="userRealName">
+                </div>
+                <div class="form-group">
+                    <label>性别</label>
+                    <select class="form-control" id="userGender">
+                        <option value="0">未知</option>
+                        <option value="1">男</option>
+                        <option value="2">女</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>生日</label>
+                    <input type="date" class="form-control" id="userBirthday">
                 </div>
                 <div class="form-group">
                     <label>状态</label>
@@ -292,6 +325,22 @@
         </div>
     </div>
 
+    <!-- User Detail Modal -->
+    <div class="modal" id="userDetailModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>用户详情</h3>
+                <button class="modal-close" data-close="userDetailModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="userDetailContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="userDetailModal">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Role Modal -->
     <div class="modal" id="roleModal">
         <div class="modal-content">
@@ -302,11 +351,11 @@
             <form class="modal-body" id="roleForm">
                 <input type="hidden" id="roleId">
                 <div class="form-group">
-                    <label>角色编码 *</label>
+                    <label>角色编码 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="roleCode" required>
                 </div>
                 <div class="form-group">
-                    <label>角色名称 *</label>
+                    <label>角色名称 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="roleName" required>
                 </div>
                 <div class="form-group">
@@ -373,19 +422,19 @@
             <form class="modal-body" id="permissionForm">
                 <input type="hidden" id="permissionId">
                 <div class="form-group">
-                    <label>权限编码 *</label>
+                    <label>权限编码 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="permissionCode" required>
                 </div>
                 <div class="form-group">
-                    <label>权限名称 *</label>
+                    <label>权限名称 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="permissionName" required>
                 </div>
                 <div class="form-group">
-                    <label>资源 *</label>
+                    <label>资源 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="permissionResource" required>
                 </div>
                 <div class="form-group">
-                    <label>操作 *</label>
+                    <label>操作 <span class="required-mark">*</span></label>
                     <select class="form-control" id="permissionAction" required>
                         <option value="">请选择</option>
                         <option value="create">创建</option>
@@ -416,11 +465,11 @@
             <form class="modal-body" id="tenantForm">
                 <input type="hidden" id="tenantId">
                 <div class="form-group">
-                    <label>租户编码 *</label>
+                    <label>租户编码 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="tenantCode" required>
                 </div>
                 <div class="form-group">
-                    <label>租户名称 *</label>
+                    <label>租户名称 <span class="required-mark">*</span></label>
                     <input type="text" class="form-control" id="tenantName" required>
                 </div>
                 <div class="form-group">

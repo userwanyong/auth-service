@@ -50,6 +50,9 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
                     .email(emptyToNull(request.getEmail()))
                     .phone(emptyToNull(request.getPhone()))
                     .nickname(emptyToNull(request.getNickname()))
+                    .realName(emptyToNull(request.getRealName()))
+                    .gender(request.getGender())
+                    .birthday(request.getBirthday().isBlank() ? null : java.time.LocalDate.parse(request.getBirthday()))
                     .build()
             );
 

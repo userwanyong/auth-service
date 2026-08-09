@@ -24,6 +24,12 @@ message RegisterRpcRequest {
   string email = 4;
   string phone = 5;
   string nickname = 6;
+  // 真实姓名（选填）
+  string realName = 7;
+  // 性别（选填：0-未知，1-男，2-女）
+  int32 gender = 8;
+  // 生日（选填，ISO 日期 yyyy-MM-dd）
+  string birthday = 9;
 }
 
 // Authentication result
@@ -72,6 +78,16 @@ message UserRpcResponse {
   int64 lastLoginAt = 12;
   // 创建时间（epoch millis，0 表示未知）
   int64 createdAt = 13;
+  // 更新时间（epoch millis，0 表示未知）
+  int64 updatedAt = 14;
+  // 真实姓名
+  string realName = 15;
+  // 性别（0-未知，1-男，2-女）
+  int32 gender = 16;
+  // 生日（ISO 日期 yyyy-MM-dd，空表示未设置）
+  string birthday = 17;
+  // 手机号是否已验证
+  bool phoneVerified = 18;
 }
 
 // Token response
@@ -164,6 +180,12 @@ message UpdateUserRpcRequest {
   // 仅出现在列表中的字段会被更新，其余保持不变。解决了 proto3 中
   // status=0（禁用）、空字符串（清空）等默认值无法表达的陷阱。
   repeated string fields_to_update = 10;
+  // 真实姓名（配合 fields_to_update 使用）
+  string realName = 11;
+  // 性别（0-未知，1-男，2-女）
+  int32 gender = 12;
+  // 生日（ISO 日期 yyyy-MM-dd）
+  string birthday = 13;
 }
 
 // Update user status request

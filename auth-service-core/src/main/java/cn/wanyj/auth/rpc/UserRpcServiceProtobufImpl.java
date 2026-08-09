@@ -48,6 +48,10 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
                     case "nickname" -> updateUserRequest.setNickname(request.getNickname());
                     case "avatar" -> updateUserRequest.setAvatar(request.getAvatar());
                     case "status" -> updateUserRequest.setStatus(request.getStatus());
+                    case "realName" -> updateUserRequest.setRealName(request.getRealName());
+                    case "gender" -> updateUserRequest.setGender(request.getGender());
+                    case "birthday" -> updateUserRequest.setBirthday(
+                        request.getBirthday().isBlank() ? null : java.time.LocalDate.parse(request.getBirthday()));
                     default -> log.warn("Unknown field in fields_to_update: {}", field);
                 }
             }

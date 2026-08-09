@@ -42,6 +42,18 @@ public class User {
 
     private Boolean emailVerified;
 
+    /** 手机号是否已验证（系统字段，由手机验证流程设置） */
+    private Boolean phoneVerified;
+
+    /** 真实姓名 */
+    private String realName;
+
+    /** 性别：0-未知，1-男，2-女 */
+    private Integer gender;
+
+    /** 生日 */
+    private java.time.LocalDate birthday;
+
     private LocalDateTime lastLoginAt;
 
     private LocalDateTime createdAt;

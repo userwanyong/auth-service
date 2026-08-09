@@ -216,6 +216,22 @@ public class UserServiceImpl implements UserService {
             user.setNickname(nickname.isEmpty() ? null : nickname);
         }
 
+        // realName: null=不改，空串=清空，非空=更新
+        if (request.getRealName() != null) {
+            String realName = request.getRealName().trim();
+            user.setRealName(realName.isEmpty() ? null : realName);
+        }
+
+        // gender: null=不改
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+
+        // birthday: null=不改
+        if (request.getBirthday() != null) {
+            user.setBirthday(request.getBirthday());
+        }
+
         if (request.getAvatar() != null) {
             String avatar = request.getAvatar().trim();
             user.setAvatar(avatar.isEmpty() ? null : avatar);
@@ -348,8 +364,13 @@ public class UserServiceImpl implements UserService {
                 .avatar(user.getAvatar())
                 .status(user.getStatus())
                 .emailVerified(user.getEmailVerified())
+                .phoneVerified(user.getPhoneVerified())
+                .realName(user.getRealName())
+                .gender(user.getGender())
+                .birthday(user.getBirthday())
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .roles(roles)
                 .permissions(permissions)
                 .build();
@@ -370,9 +391,18 @@ public class UserServiceImpl implements UserService {
                 .tenantId(user.getTenantId())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .nickname(user.getNickname())
+                .avatar(user.getAvatar())
+                .realName(user.getRealName())
+                .gender(user.getGender())
+                .birthday(user.getBirthday())
                 .status(user.getStatus())
+                .emailVerified(user.getEmailVerified())
+                .phoneVerified(user.getPhoneVerified())
+                .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .roles(roles)
                 .build();
     }

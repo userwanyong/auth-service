@@ -132,6 +132,13 @@
             <version>4.0.0</version>
         </dependency>
 
+        <!-- Aliyun OSS SDK (头像上传) -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <version>3.18.4</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

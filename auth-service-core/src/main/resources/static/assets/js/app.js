@@ -65,8 +65,11 @@
         // Setup modals
         setupModals();
 
-        // Load initial page - all tenants go to dashboard first
-        navigateTo('dashboard');
+        // Setup hash-based routing (so refresh / browser back-forward restores the page)
+        setupHashRouting();
+
+        // Load initial page from URL hash (default: dashboard)
+        navigateTo(getPageFromHash());
     }
 
     /**
@@ -129,10 +132,42 @@
         });
     }
 
+    // Pages that can be stored in the URL hash
+    const VALID_PAGES = ['dashboard', 'users', 'roles', 'permissions', 'tenants'];
+
+    /**
+     * Read target page from URL hash, fall back to dashboard
+     */
+    function getPageFromHash() {
+        const hash = (window.location.hash || '').replace('#', '');
+        return VALID_PAGES.includes(hash) ? hash : 'dashboard';
+    }
+
+    /**
+     * Keep currentPage in sync with the URL hash so manual URL changes
+     * and browser back/forward restore the right page
+     */
+    function setupHashRouting() {
+        window.addEventListener('hashchange', () => {
+            const page = getPageFromHash();
+            if (page !== currentPage) {
+                navigateTo(page);
+            }
+        });
+    }
+
     /**
      * Navigate to page
      */
     async function navigateTo(page) {
+        // Guard: restrict accessible pages by tenant type
+        const isPlatform = Auth.isPlatformTenant();
+        if (isPlatform && ['users', 'roles', 'permissions'].includes(page)) {
+            page = 'dashboard';
+        } else if (!isPlatform && page === 'tenants') {
+            page = 'dashboard';
+        }
+
         // Update nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
@@ -149,6 +184,12 @@
         }
 
         currentPage = page;
+
+        // Sync URL hash (replaceState avoids piling up duplicate history entries on each click)
+        const targetHash = '#' + page;
+        if (window.location.hash !== targetHash) {
+            history.replaceState(null, '', targetHash);
+        }
 
         // Load page data
         switch (page) {
@@ -277,7 +318,7 @@
                 document.getElementById('statPermissions').textContent = permissionsResult.length || 0;
             }
         } catch (error) {
-            Toast.error('加载仪表盘数据失�? ' + error.message);
+            Toast.error('加载仪表盘数据失败: ' + error.message);
         }
     }
 
@@ -296,24 +337,27 @@
     function renderUsersTable() {
         const tbody = document.getElementById('usersTableBody');
         if (usersData.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无数据</td></tr>';
             return;
         }
 
         tbody.innerHTML = usersData.items.map(user => `
             <tr>
                 <td>${user.id}</td>
+                <td>${user.avatar ? `<img src="${escapeHtml(user.avatar)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">` : '-'}</td>
                 <td>${escapeHtml(user.username)}</td>
-                <td>${escapeHtml(user.email || '-')}</td>
+                <td>${escapeHtml(user.email || '-')}${verifiedBadge(user.emailVerified)}</td>
+                <td>${escapeHtml(user.phone || '-')}${verifiedBadge(user.phoneVerified)}</td>
                 <td>${escapeHtml(user.nickname || '-')}</td>
                 <td>${user.status === 1 ?
                     '<span class="badge badge-success">启用</span>' :
                     '<span class="badge badge-danger">禁用</span>'}</td>
                 <td>${Array.isArray(user.roles) && user.roles.length > 0 ? user.roles.map(r =>
                     `<span class="badge badge-info">${r.replace('ROLE_', '')}</span>`
-                ).join(' ') : '<span class="text-muted">Unassigned</span>'}</td>
+                ).join(' ') : '<span class="text-muted">无</span>'}</td>
                 <td>
                     <div class="action-buttons">
+                        <button class="btn btn-sm btn-outline" onclick='App.showUserDetail(${quoteJsString(user.id)})'>详情</button>
                         <button class="btn btn-sm btn-outline" onclick='App.editUser(${quoteJsString(user.id)})'>编辑</button>
                         <button class="btn btn-sm btn-secondary" onclick='App.assignUserRoles(${quoteJsString(user.id)})'>角色</button>
                         <button class="btn btn-sm btn-danger" onclick='App.deleteUser(${quoteJsString(user.id)})'>删除</button>
@@ -332,9 +376,9 @@
         }
 
         let html = `
-            <button ${currentUsersPage === 1 ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage - 1})">Prev</button>
-            <span class="page-info">Page ${currentUsersPage} / ${totalPages}</span>
-            <button ${currentUsersPage >= totalPages ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage + 1})">Next</button>
+            <button ${currentUsersPage === 1 ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage - 1})">上一页</button>
+            <span class="page-info">第 ${currentUsersPage} / ${totalPages} 页</span>
+            <button ${currentUsersPage >= totalPages ? 'disabled' : ''} onclick="App.usersPage(${currentUsersPage + 1})">下一页</button>
         `;
         container.innerHTML = html;
     }
@@ -365,6 +409,22 @@
             await saveUser();
         });
 
+        // Avatar upload (选文件后自动上传到 OSS)
+        document.getElementById('userAvatarFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const result = await API.Upload.avatar(file);
+                document.getElementById('userAvatar').value = result.url;
+                const preview = document.getElementById('userAvatarPreview');
+                preview.src = result.url;
+                preview.style.display = '';
+                Toast.success('头像上传成功');
+            } catch (error) {
+                Toast.error('头像上传失败: ' + error.message);
+            }
+        });
+
         // User roles modal
         setupUserRolesModal();
     }
@@ -375,9 +435,41 @@
         document.getElementById('userId').value = user ? user.id : '';
         document.getElementById('userUsername').value = user ? user.username : '';
         document.getElementById('userPassword').value = '';
-        document.getElementById('userPassword').placeholder = user ? 'Leave blank to keep current password' : 'Enter password';
+        document.getElementById('userPassword').placeholder = user ? '留空表示不修改密码' : '请输入密码';
+        // 必填标识：新增时密码必填（显示红色 *），编辑时选填（留空不修改）
+        const passwordLabel = document.getElementById('userPasswordLabel');
+        const passwordHint = document.getElementById('userPasswordHint');
+        if (passwordLabel && passwordHint) {
+            if (user) {
+                passwordLabel.innerHTML = '密码';
+                passwordHint.textContent = '编辑时留空则不修改密码';
+            } else {
+                passwordLabel.innerHTML = '密码 <span class="required-mark">*</span>';
+                passwordHint.textContent = '密码长度不少于 6 位';
+            }
+        }
         document.getElementById('userEmail').value = user ? (user.email || '') : '';
         document.getElementById('userNickname').value = user ? (user.nickname || '') : '';
+        document.getElementById('userPhone').value = user ? (user.phone || '') : '';
+        document.getElementById('userRealName').value = user ? (user.realName || '') : '';
+        document.getElementById('userGender').value = user && user.gender != null ? user.gender : 0;
+        // birthday 兼容后端返回的字符串("2000-01-01")或数组([2000,1,1])
+        document.getElementById('userBirthday').value = user && user.birthday
+            ? (Array.isArray(user.birthday)
+                ? `${user.birthday[0]}-${String(user.birthday[1]).padStart(2, '0')}-${String(user.birthday[2]).padStart(2, '0')}`
+                : String(user.birthday).slice(0, 10))
+            : '';
+        // 头像回填
+        document.getElementById('userAvatar').value = user ? (user.avatar || '') : '';
+        document.getElementById('userAvatarFile').value = '';
+        const avatarPreview = document.getElementById('userAvatarPreview');
+        if (user && user.avatar) {
+            avatarPreview.src = user.avatar;
+            avatarPreview.style.display = '';
+        } else {
+            avatarPreview.src = '';
+            avatarPreview.style.display = 'none';
+        }
         document.getElementById('userStatus').value = user ? user.status : 1;
 
         openModal('userModal');
@@ -389,6 +481,11 @@
         const password = document.getElementById('userPassword').value;
         const email = document.getElementById('userEmail').value.trim();
         const nickname = document.getElementById('userNickname').value.trim();
+        const phone = document.getElementById('userPhone').value.trim();
+        const realName = document.getElementById('userRealName').value.trim();
+        const gender = parseInt(document.getElementById('userGender').value);
+        const birthday = document.getElementById('userBirthday').value;
+        const avatar = document.getElementById('userAvatar').value.trim();
         const status = parseInt(document.getElementById('userStatus').value);
 
         if (!username) {
@@ -397,7 +494,7 @@
         }
 
         if (!id && !password) {
-            Toast.error('Enter password');
+            Toast.error('请输入密码');
             return;
         }
         try {
@@ -406,7 +503,12 @@
                     username,
                     password: password || null,
                     email: email || null,
+                    phone: phone || null,
                     nickname: nickname || null,
+                    realName: realName || null,
+                    gender,
+                    birthday: birthday || null,
+                    avatar: avatar || null,
                     status
                 });
                 Toast.success('用户更新成功');
@@ -421,7 +523,12 @@
                     password,
                     tenantId: currentUser.tenantId,
                     email: email || null,
-                    nickname: nickname || null
+                    phone: phone || null,
+                    nickname: nickname || null,
+                    realName: realName || null,
+                    gender,
+                    birthday: birthday || null,
+                    avatar: avatar || null
                 });
 
                 // Register defaults to enabled status. If disabled is selected, sync status after creation.
@@ -435,6 +542,46 @@
             await loadUsers();
         } catch (error) {
             Toast.error('保存失败: ' + error.message);
+        }
+    }
+
+    async function showUserDetail(id) {
+        try {
+            const user = await API.Users.getById(id);
+            const rolesHtml = Array.isArray(user.roles) && user.roles.length > 0
+                ? user.roles.map(r => `<span class="badge badge-info">${escapeHtml(r.replace('ROLE_', ''))}</span>`).join(' ')
+                : '<span class="text-muted">无</span>';
+            const perms = Array.isArray(user.permissions) ? user.permissions : [];
+            const permHtml = perms.length
+                ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
+                  perms.map(p => `<span class="badge badge-info">${escapeHtml(p)}</span>`).join('') +
+                  `</div>`
+                : '<span class="text-muted">无</span>';
+            const rows = [
+                ['ID', user.id],
+                ['租户ID', user.tenantId],
+                ['用户名', escapeHtml(user.username)],
+                ['真实姓名', escapeHtml(user.realName || '-')],
+                ['邮箱', escapeHtml(user.email || '-') + verifiedBadge(user.emailVerified)],
+                ['手机号', escapeHtml(user.phone || '-') + verifiedBadge(user.phoneVerified)],
+                ['昵称', escapeHtml(user.nickname || '-')],
+                ['头像', user.avatar ? `<img src="${escapeHtml(user.avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;vertical-align:middle">` : '-'],
+                ['性别', formatGender(user.gender)],
+                ['生日', formatDate(user.birthday)],
+                ['状态', user.status === 1 ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-danger">禁用</span>'],
+                ['当前角色', `<div style="display:flex;flex-wrap:wrap;gap:6px;">${rolesHtml}</div>`],
+                ['最后登录', formatDateTime(user.lastLoginAt)],
+                ['创建时间', formatDateTime(user.createdAt)],
+                ['更新时间', formatDateTime(user.updatedAt)]
+            ];
+            document.getElementById('userDetailContent').innerHTML =
+                '<div style="display:grid;grid-template-columns:110px 1fr;gap:10px 16px;align-items:start;">' +
+                rows.map(([k, v]) => `<strong style="color:var(--text-secondary);padding-top:6px;">${k}</strong><span>${v != null ? v : '-'}</span>`).join('') +
+                `<strong style="color:var(--text-secondary);padding-top:6px;">权限 <small style="font-weight:normal;opacity:.7;">(${perms.length})</small></strong><span>${permHtml}</span>` +
+                '</div>';
+            openModal('userDetailModal');
+        } catch (error) {
+            Toast.error('加载用户详情失败: ' + error.message);
         }
     }
 
@@ -842,14 +989,14 @@
             tenantName = `ID: ${id}`;
         }
 
-        const warningMessage = `Delete tenant "${tenantName}"?\n\n` +
-            `This will also delete all tenant data, including:\n` +
-            `- all users\n` +
-            `- all roles\n` +
-            `- all permissions\n` +
-            `- user-role relations\n` +
-            `- role-permission relations\n\n` +
-            `This action cannot be undone.`;
+        const warningMessage = `确定要删除租户「${tenantName}」吗？\n\n` +
+            `该操作将同时删除该租户下的所有数据，包括：\n` +
+            `- 全部用户\n` +
+            `- 全部角色\n` +
+            `- 全部权限\n` +
+            `- 用户-角色关联\n` +
+            `- 角色-权限关联\n\n` +
+            `此操作不可撤销。`;
 
         if (!confirm(warningMessage)) return;
 
@@ -863,6 +1010,45 @@
     }
 
     // ========== Utility Functions ==========
+    function formatGender(g) {
+        if (g === 1) return '男';
+        if (g === 2) return '女';
+        return '未知';
+    }
+
+    /** 格式化日期（兼容字符串 "2000-01-01" 或数组 [2000,1,1]） */
+    function formatDate(value) {
+        if (!value) return '-';
+        if (Array.isArray(value)) {
+            return `${value[0]}-${String(value[1]).padStart(2, '0')}-${String(value[2]).padStart(2, '0')}`;
+        }
+        return String(value).slice(0, 10);
+    }
+
+    /** 格式化日期时间（兼容字符串或数组） */
+    function formatDateTime(value) {
+        if (!value) return '-';
+        let d;
+        if (Array.isArray(value)) {
+            d = new Date(value[0], (value[1] || 1) - 1, value[2] || 1, value[3] || 0, value[4] || 0, value[5] || 0);
+        } else {
+            d = new Date(value);
+        }
+        return isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+    }
+
+    /** 验证状态徽章 */
+    function formatVerified(v) {
+        return v ? '<span class="badge badge-success">已验证</span>'
+                 : '<span class="badge badge-danger">未验证</span>';
+    }
+
+    /** 邮箱/手机验证状态徽章（已验证绿/未验证红） */
+    function verifiedBadge(v) {
+        return v ? ' <span class="badge badge-success">已验证</span>'
+                 : ' <span class="badge badge-danger">未验证</span>';
+    }
+
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -926,6 +1112,7 @@
         deleteUser,
         assignUserRoles,
         usersPage,
+        showUserDetail,
         editRole,
         deleteRole,
         rolePermissions,

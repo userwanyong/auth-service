@@ -103,12 +103,14 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
+        // 将字段级错误拼接到 message，前端只读 message 也能展示具体原因
+        String message = String.join("; ", errors.values());
         logger.warn("Validation exception: {}", errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.<Map<String, String>>builder()
                         .code(ErrorCode.BAD_REQUEST.getCode())
-                        .message("请求参数错误")
+                        .message(message.isEmpty() ? "请求参数错误" : message)
                         .data(errors)
                         .build());
     }

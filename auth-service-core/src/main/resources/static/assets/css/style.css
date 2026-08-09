@@ -337,6 +337,12 @@ body {
     color: var(--text-primary);
 }
 
+/* 必填项标记：红色 * */
+.required-mark {
+    color: var(--danger-color);
+    margin-left: 2px;
+}
+
 .form-control {
     width: 100%;
     padding: 10px 12px;
@@ -497,7 +503,7 @@ body {
     background-color: var(--bg-primary);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow);
-    overflow: hidden;
+    overflow-x: auto;
 }
 
 .table-filters {
@@ -509,6 +515,7 @@ body {
 
 .data-table {
     width: 100%;
+    min-width: 1400px;
     border-collapse: collapse;
 }
 
@@ -530,6 +537,7 @@ body {
 .data-table td {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
 }
 
 .data-table tbody tr:last-child td {

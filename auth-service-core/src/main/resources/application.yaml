@@ -114,3 +114,12 @@ dubbo:
   # Scan RPC service packages
   scan:
     base-packages: cn.wanyj.auth.rpc
+
+# ========== Aliyun OSS (头像上传；不配置 endpoint 则上传接口返回「OSS 未配置」) ==========
+aliyun:
+  oss:
+    endpoint: ${OSS_ENDPOINT:}
+    bucket: ${OSS_BUCKET:}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    object-prefix: ${OSS_OBJECT_PREFIX:avatar}

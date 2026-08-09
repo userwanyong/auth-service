@@ -36,8 +36,13 @@ public final class UserProtobufConverter {
                 .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : Collections.emptyList())
                 .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
                 .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
+                .setPhoneVerified(user.getPhoneVerified() != null && user.getPhoneVerified())
+                .setRealName(user.getRealName() != null ? user.getRealName() : "")
+                .setGender(user.getGender() != null ? user.getGender() : 0)
+                .setBirthday(user.getBirthday() != null ? user.getBirthday().toString() : "")
                 .setLastLoginAt(toEpochMilli(user.getLastLoginAt()))
                 .setCreatedAt(toEpochMilli(user.getCreatedAt()))
+                .setUpdatedAt(toEpochMilli(user.getUpdatedAt()))
                 .build();
     }
 

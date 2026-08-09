@@ -37,4 +37,16 @@ public class UpdateUserRequest {
     @Min(value = 0, message = "状态值无效")
     @Max(value = 1, message = "状态值无效")
     private Integer status;
+
+    /** 真实姓名 */
+    @Size(max = 50, message = "真实姓名长度不能超过50")
+    private String realName;
+
+    /** 性别：0-未知，1-男，2-女 */
+    @Min(value = 0, message = "性别值无效")
+    @Max(value = 2, message = "性别值无效")
+    private Integer gender;
+
+    /** 生日（yyyy-MM-dd） */
+    private java.time.LocalDate birthday;
 }

@@ -152,7 +152,7 @@ const Auth = (function() {
     async function refreshToken() {
         const refreshTokenValue = getRefreshToken();
         if (!refreshTokenValue) {
-            throw new Error('No refresh token available');
+            throw new Error('无可用刷新令牌');
         }
 
         try {
@@ -164,7 +164,7 @@ const Auth = (function() {
             });
 
             if (!response.ok) {
-                throw new Error('Token refresh failed');
+                throw new Error('令牌刷新失败');
             }
 
             const result = await response.json();
@@ -172,7 +172,7 @@ const Auth = (function() {
                 updateTokens(result.data.accessToken, result.data.refreshToken);
                 return result.data.accessToken;
             }
-            throw new Error('Invalid refresh response');
+            throw new Error('刷新令牌响应无效');
         } catch (error) {
             clearAuthData();
             window.location.href = '/login.html';

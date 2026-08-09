@@ -18,6 +18,10 @@
         <result property="lastLoginAt" column="last_login_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
+        <result property="realName" column="real_name"/>
+        <result property="gender" column="gender"/>
+        <result property="birthday" column="birthday"/>
+        <result property="phoneVerified" column="phone_verified"/>
     </resultMap>
 
     <!-- Result Map with Roles -->
@@ -62,7 +66,8 @@
     <!-- Find By Id -->
     <select id="findById" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE id = #{id}
     </select>
@@ -70,7 +75,8 @@
     <!-- Find By Username And TenantId -->
     <select id="findByUsername" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE username = #{username}
           AND tenant_id = #{tenantId}
@@ -79,7 +85,8 @@
     <!-- Find By Email And TenantId -->
     <select id="findByEmail" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE email = #{email}
           AND tenant_id = #{tenantId}
@@ -88,7 +95,8 @@
     <!-- Find By Username Or Email And TenantId -->
     <select id="findByUsernameOrEmail" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE (username = #{identifier} OR email = #{identifier})
           AND tenant_id = #{tenantId}
@@ -113,7 +121,8 @@
     <!-- Find By Keyword -->
     <select id="findByKeyword" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE tenant_id = #{tenantId}
           AND (username LIKE CONCAT('%', #{keyword}, '%')
@@ -133,7 +142,8 @@
     <!-- Find All By Tenant Id -->
     <select id="findAllByTenantId" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
-               status, email_verified, last_login_at, created_at, updated_at
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
         FROM user
         WHERE tenant_id = #{tenantId}
         ORDER BY created_at DESC
@@ -143,6 +153,7 @@
     <select id="findAllByTenantIdWithRoles" resultMap="UserWithRolesResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at
@@ -157,6 +168,7 @@
     <select id="findAllByTenantIdWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
@@ -177,6 +189,7 @@
     <select id="findByKeywordWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
@@ -205,9 +218,11 @@
     <!-- Insert -->
     <insert id="insert" parameterType="cn.wanyj.auth.entity.User">
         INSERT INTO user (id, tenant_id, username, password, email, phone, nickname, avatar,
-                         status, email_verified, last_login_at, created_at, updated_at)
+                         status, email_verified, last_login_at, created_at, updated_at,
+                         real_name, gender, birthday, phone_verified)
         VALUES (#{id}, #{tenantId}, #{username}, #{password}, #{email}, #{phone}, #{nickname}, #{avatar},
-                #{status}, #{emailVerified}, #{lastLoginAt}, NOW(), NOW())
+                #{status}, #{emailVerified}, #{lastLoginAt}, NOW(), NOW(),
+                #{realName}, #{gender}, #{birthday}, #{phoneVerified})
     </insert>
 
     <!-- Update -->
@@ -222,6 +237,10 @@
             status = #{status},
             email_verified = #{emailVerified},
             last_login_at = #{lastLoginAt},
+            real_name = #{realName},
+            gender = #{gender},
+            birthday = #{birthday},
+            phone_verified = #{phoneVerified},
             updated_at = NOW()
         WHERE id = #{id}
     </update>
@@ -235,6 +254,7 @@
     <select id="findByIdWithRoles" resultMap="UserWithRolesResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at
@@ -248,6 +268,7 @@
     <select id="findByIdWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
@@ -269,6 +290,7 @@
     <select id="findByUsernameOrEmailWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,
@@ -290,6 +312,7 @@
     <select id="findByUsernameWithRolesAndPermissions" resultMap="UserWithRolesAndPermissionsResultMap">
         SELECT u.id, u.tenant_id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar,
                u.status, u.email_verified, u.last_login_at, u.created_at, u.updated_at,
+               u.real_name, u.gender, u.birthday, u.phone_verified,
                r.id AS role_id, r.tenant_id AS role_tenant_id, r.code AS role_code, r.name AS role_name,
                r.description AS role_description, r.status AS role_status,
                r.created_at AS role_created_at, r.updated_at AS role_updated_at,

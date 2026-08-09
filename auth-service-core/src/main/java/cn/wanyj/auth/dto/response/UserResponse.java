@@ -29,8 +29,13 @@ public class UserResponse {
     private String avatar;
     private Integer status;
     private Boolean emailVerified;
+    private Boolean phoneVerified;
+    private String realName;
+    private Integer gender;
+    private java.time.LocalDate birthday;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private Set<String> roles;
     private Set<String> permissions;
 }

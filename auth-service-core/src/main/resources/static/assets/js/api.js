@@ -11,8 +11,11 @@ const API = (function() {
      */
     function buildOptions(options = {}) {
         const token = Auth.getAccessToken();
+        // FormData（文件上传）时不设 Content-Type，让浏览器自动加 multipart boundary；
+        // 否则会被强制成 application/json，导致后端报 not a multipart request
+        const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const headers = {
-            'Content-Type': 'application/json',
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...options.headers
         };
 
@@ -42,14 +45,14 @@ const API = (function() {
             } catch (error) {
                 Auth.clearAuthData();
                 window.location.href = '/login.html';
-                throw new Error('Session expired');
+                throw new Error('会话已过期，请重新登录');
             }
         }
 
         const data = await response.json();
 
         if (!response.ok || data.code < 200 || data.code >= 300) {
-            throw new Error(data.message || 'Request failed');
+            throw new Error(data.message || '请求失败');
         }
 
         return data.data;
@@ -376,12 +379,26 @@ const API = (function() {
         getAvailable: () => get('/tenant/available')
     };
 
+    // ========== Upload API ==========
+    const UploadAPI = {
+        /**
+         * Upload avatar (multipart/form-data)
+         * POST /api/upload/avatar → { url }
+         */
+        avatar: (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            return postForm('/upload/avatar', formData);
+        }
+    };
+
     // Public API
     return {
         Auth: AuthAPI,
         Users: UsersAPI,
         Roles: RolesAPI,
         Permissions: PermissionsAPI,
-        Tenants: TenantsAPI
+        Tenants: TenantsAPI,
+        Upload: UploadAPI
     };
 })();

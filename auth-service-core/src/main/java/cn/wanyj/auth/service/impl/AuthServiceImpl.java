@@ -92,8 +92,13 @@ public class AuthServiceImpl implements AuthService {
                 .phone(request.getPhone())
                 .nickname(request.getNickname() != null && !request.getNickname().isBlank()
                         ? request.getNickname() : request.getUsername())
+                .realName(request.getRealName())
+                .gender(request.getGender())
+                .birthday(request.getBirthday())
+                .avatar(request.getAvatar())
                 .status(1)
                 .emailVerified(false)
+                .phoneVerified(false)
                 .roles(new HashSet<>())
                 .build();
 
