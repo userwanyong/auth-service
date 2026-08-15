@@ -27,11 +27,16 @@ public class CodeServiceImpl implements CodeService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
-    public String generateAndStore(Long tenantId, String method, String target) {
+    public String generateAndStore(Long tenantId, String method, String target, long ttlMinutes) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        redisTemplate.opsForValue().set(key(tenantId, method, target), code, CODE_TTL_MINUTES, TimeUnit.MINUTES);
-        log.debug("Login code stored: tenant={}, method={}", tenantId, method);
+        redisTemplate.opsForValue().set(key(tenantId, method, target), code, ttlMinutes, TimeUnit.MINUTES);
+        log.debug("Login code stored: tenant={}, method={}, ttl={}min", tenantId, method, ttlMinutes);
         return code;
+    }
+
+    @Override
+    public long getTtlMinutes() {
+        return CODE_TTL_MINUTES;
     }
 
     @Override

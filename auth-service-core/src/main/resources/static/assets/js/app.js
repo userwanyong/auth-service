@@ -1175,20 +1175,25 @@
     let loginMethodsScope = 'tenant';
 
     // 各登录方式的凭证字段定义（用于生成结构化表单，避免操作员手写 JSON）
+    // optional: true 表示模板增强字段：单独填写即可保存（与已存凭证按键合并，无需重填凭证）
     const CREDENTIAL_FIELDS = {
         'email:aliyun': [
             { key: 'accessKeyId', label: 'AccessKey ID', type: 'text', required: true, placeholder: 'LTAI...' },
             { key: 'accessKeySecret', label: 'AccessKey Secret', type: 'password', required: true },
             { key: 'accountName', label: '发信地址 accountName', type: 'text', required: true, placeholder: 'noreply@你的发信域名' },
             { key: 'fromAlias', label: '发件人别名', type: 'text', required: false, placeholder: 'Auth Service' },
-            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' }
+            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' },
+            { key: 'codeTtlMinutes', label: '验证码有效期（分钟，可选）', type: 'text', required: false, optional: true, placeholder: '默认 5，范围 1~30' },
+            { key: 'subject', label: '邮件主题（可选）', type: 'text', required: false, optional: true, placeholder: '登录验证码' },
+            { key: 'template', label: '正文模板（可选，HTML）', type: 'textarea', required: false, optional: true, placeholder: '支持 {code}（验证码）与 {minutes}（有效分钟数，跟随上方配置）占位符，必须包含 {code}，否则使用默认文案。例：<p>您的验证码是：<strong>{code}</strong>，{minutes} 分钟内有效。</p>' }
         ],
         'sms:aliyun': [
             { key: 'accessKeyId', label: 'AccessKey ID', type: 'text', required: true, placeholder: 'LTAI...' },
             { key: 'accessKeySecret', label: 'AccessKey Secret', type: 'password', required: true },
             { key: 'signName', label: '短信签名 signName', type: 'text', required: true, placeholder: '你在阿里云报备的签名' },
             { key: 'templateCode', label: '模板 CODE templateCode', type: 'text', required: true, placeholder: 'SMS_xxxxxxxx（模板须含 ${code}）' },
-            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' }
+            { key: 'region', label: '地域 region', type: 'text', required: false, placeholder: 'cn-hangzhou', default: 'cn-hangzhou' },
+            { key: 'codeTtlMinutes', label: '验证码有效期（分钟，可选）', type: 'text', required: false, optional: true, placeholder: '默认 5，范围 1~30' }
         ],
         'oauth:gitee': [
             { key: 'clientId', label: 'Client ID', type: 'text', required: true },
@@ -1293,14 +1298,18 @@
             container.innerHTML = '<div class="form-text" style="padding:8px 0;">该登录方式无需凭证。</div>';
             return;
         }
-        container.innerHTML = fields.map(f => `
+        container.innerHTML = fields.map(f => {
+            const placeholder = escapeHtml(f.placeholder || (f.default ? '默认 ' + f.default : ''));
+            const control = f.type === 'textarea'
+                ? `<textarea class="form-control" data-field="${f.key}" rows="5" placeholder="${placeholder}" autocomplete="off"></textarea>`
+                : `<input type="${f.type}" class="form-control" data-field="${f.key}" placeholder="${placeholder}" autocomplete="off">`;
+            return `
             <div class="form-group">
                 <label>${escapeHtml(f.label)}${f.required ? ' <span class="required-mark">*</span>' : ''}</label>
-                <input type="${f.type}" class="form-control" data-field="${f.key}"
-                       placeholder="${escapeHtml(f.placeholder || (f.default ? '默认 ' + f.default : ''))}"
-                       autocomplete="off">
+                ${control}
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     /** 根据当前 scope/凭证来源/方式 切换凭证字段区显隐 */
@@ -1318,15 +1327,15 @@
         configGroup.style.display = '';
         if (loginMethodsScope === 'platform') {
             fieldsBox.style.display = '';
-            hint.textContent = '填写后将整组覆盖默认凭证（全部留空则不修改）。修改时需填全所有必填项。';
+            hint.textContent = '填写的字段将覆盖已保存配置，留空字段保留原值（可只改邮件模板，无需重填凭证）。修改凭证时需填全所有必填项。';
         } else {
             const usePlatform = parseInt(document.getElementById('loginMethodUsePlatform').value);
             if (usePlatform === 1) {
                 fieldsBox.style.display = 'none';
-                hint.textContent = '当前使用平台默认凭证。如需改用本租户自有凭证，请将上方“凭证来源”切换为“使用本租户自有凭证”。';
+                hint.textContent = '当前使用平台默认凭证与模板。如需改用本租户自有凭证与模板，请将上方“凭证来源”切换为“使用本租户自有凭证”。';
             } else {
                 fieldsBox.style.display = '';
-                hint.textContent = '填写本租户自有凭证（全部留空则不修改）。需填全所有必填项。';
+                hint.textContent = '填写本租户自有凭证/模板（留空字段保留原值，全部留空则不修改）。修改凭证时需填全所有必填项。';
             }
         }
     }
@@ -1350,27 +1359,37 @@
             data.usePlatformConfig = parseInt(document.getElementById('loginMethodUsePlatform').value);
         }
 
-        // 收集凭证字段（仅平台级，或租户级选择"自有凭证"时）
+        // 收集凭证/模板字段（仅平台级，或租户级选择"自有凭证"时）
+        // 规则：填写的字段才进 JSON；后端与已存配置按键合并，未传字段保留原值。
+        // 因此可只改邮件模板（subject/template）而不重填脱敏的 AK 凭证。
         const fields = CREDENTIAL_FIELDS[method];
         const needCredential = fields && (loginMethodsScope === 'platform'
             || (loginMethodsScope === 'tenant' && data.usePlatformConfig === 0));
         if (needCredential) {
             const cred = {};
-            let hasInput = false;
-            let missing = null;
+            let hasCredInput = false;
             fields.forEach(f => {
                 const input = document.querySelector('#loginMethodConfigFields [data-field="' + f.key + '"]');
                 const val = input ? input.value.trim() : '';
-                if (val) { cred[f.key] = val; hasInput = true; }
-                else if (f.default) { cred[f.key] = f.default; }
-                else { cred[f.key] = ''; }
-                if (f.required && !cred[f.key]) { missing = f.label; }
+                if (val) {
+                    cred[f.key] = val;
+                    if (!f.optional) { hasCredInput = true; }
+                }
             });
-            if (hasInput) {
+            let missing = null;
+            // 仅当本次要修改凭证时才校验必填项/补默认值，避免只改模板被强制重填凭证
+            if (hasCredInput) {
+                fields.forEach(f => {
+                    if (f.optional || cred[f.key]) { return; }
+                    if (f.default) { cred[f.key] = f.default; return; }
+                    if (f.required) { missing = missing || f.label; }
+                });
+            }
+            if (Object.keys(cred).length) {
                 if (missing) { Toast.error('请填写必填项：' + missing); return; }
                 data.configJson = JSON.stringify(cred);
             }
-            // 全部留空 → 不传 configJson，保留原凭证
+            // 全部留空 → 不传 configJson，保留原配置
         }
 
         try {

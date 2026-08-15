@@ -348,22 +348,7 @@ message PermissionListResponse {
 }
 
 // ==================== Services ====================
-
-// Authentication RPC Service (Protobuf IDL mode)
-service AuthRpcServiceProtobuf {
-  rpc register(RegisterRpcRequest) returns (RegisterRpcResult);
-  rpc authenticate(LoginRpcRequest) returns (AuthResult);
-  rpc getUserById(UserByIdRequest) returns (UserRpcResponse);
-  rpc getUserByUsername(UserByUsernameRequest) returns (UserRpcResponse);
-  rpc hasPermission(PermissionCheckRequest) returns (BoolValue);
-  rpc hasRole(RoleCheckRequest) returns (BoolValue);
-  rpc getUserPermissions(UserPermissionsRequest) returns (StringListResponse);
-  rpc getUserRoles(UserRolesRequest) returns (StringListResponse);
-  rpc searchUsers(SearchUsersRequest) returns (UserPageResponse);
-  rpc refreshToken(RefreshTokenRpcRequest) returns (TokenRpcResponse);
-  rpc logout(LogoutRpcRequest) returns (OperationResult);
-  rpc changePassword(ChangePasswordRpcRequest) returns (OperationResult);
-}
+// (Authentication extension service moved to the end of this file)
 
 // Token RPC Service (Protobuf IDL mode)
 service TokenRpcServiceProtobuf {
@@ -422,3 +407,281 @@ message BoolValue {
 
 // Empty response
 message Empty {}
+
+// ==================== Verification Code Messages ====================
+
+// Send verification code RPC request (email/sms login)
+message SendCodeRpcRequest {
+  // 对外租户标识
+  string tenantUid = 1;
+  // 登录方式：email:aliyun / sms:aliyun
+  string method = 2;
+  // 接收目标：邮箱地址或手机号
+  string target = 3;
+}
+
+// Login by verification code RPC request
+message LoginByCodeRpcRequest {
+  // 对外租户标识
+  string tenantUid = 1;
+  // 登录方式：email:aliyun / sms:aliyun
+  string method = 2;
+  // 接收目标：邮箱地址或手机号
+  string target = 3;
+  // 验证码
+  string code = 4;
+}
+
+// Login by verification code result
+message LoginByCodeRpcResult {
+  bool success = 1;
+  string message = 2;
+  TokenRpcResponse token = 3;
+  UserRpcResponse user = 4;
+}
+
+// ==================== OAuth Messages ====================
+
+// Build OAuth authorize URL request (login flow)
+message OAuthAuthorizeUrlRpcRequest {
+  // 对外租户标识
+  string tenantUid = 1;
+  // 提供方：gitee / github
+  string provider = 2;
+}
+
+// Build OAuth bind-authorize URL request (bind flow)
+message OAuthBindUrlRpcRequest {
+  string tenantId = 1;
+  string userId = 2;
+  // 提供方：gitee / github
+  string provider = 3;
+}
+
+// OAuth authorize URL response
+message OAuthUrlRpcResponse {
+  // 提供方授权页完整 URL（调用方自行引导浏览器跳转）
+  string url = 1;
+}
+
+// OAuth callback RPC request (exchange code, complete login/bind)
+message OAuthCallbackRpcRequest {
+  string provider = 1;
+  // 提供方回传的授权码
+  string code = 2;
+  // 提供方回传的 state（一次性）
+  string state = 3;
+}
+
+// OAuth callback result (login flow returns token; bind flow returns success/message)
+message OAuthCallbackRpcResult {
+  // true=登录流程（签发 token）；false=绑定流程（看 success/message）
+  bool login = 1;
+  // 绑定流程：是否成功
+  bool success = 2;
+  // 提示消息
+  string message = 3;
+  // 登录流程：签发的令牌
+  TokenRpcResponse token = 4;
+  // 登录流程：登录用户信息
+  UserRpcResponse user = 5;
+}
+
+// List OAuth bindings request
+message OAuthBindingsRpcRequest {
+  string tenantId = 1;
+  string userId = 2;
+}
+
+// OAuth binding information response
+message OAuthBindingRpcResponse {
+  int64 id = 1;
+  // 提供方：gitee / github
+  string provider = 2;
+  // 提供方用户唯一ID
+  string providerUid = 3;
+  // 绑定时间（epoch millis，0 表示未知）
+  int64 createdAt = 4;
+}
+
+// OAuth bindings list response
+message OAuthBindingListRpcResponse {
+  repeated OAuthBindingRpcResponse bindings = 1;
+}
+
+// Unbind OAuth provider request
+message OAuthUnbindRpcRequest {
+  string tenantId = 1;
+  string userId = 2;
+  string provider = 3;
+}
+
+// ==================== Contact Binding Messages ====================
+
+// Bind/replace email or phone RPC request (after code verification)
+message BindContactRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+  // 登录方式：email:aliyun（绑定邮箱）/ sms:aliyun（绑定手机），须与发码时一致
+  string method = 3;
+  // 目标：邮箱地址或手机号
+  string target = 4;
+  // 验证码
+  string code = 5;
+}
+
+// Unbind email/phone RPC request
+message ContactUnbindRpcRequest {
+  string userId = 1;
+  string tenantId = 2;
+}
+
+// ==================== Login Method Config Messages ====================
+
+// Login method configuration response (credentials masked, only has-config flag)
+message LoginMethodRpcResponse {
+  // 登录方式 code，如 oauth:gitee
+  string method = 1;
+  // 类别：password / email / sms / oauth
+  string category = 2;
+  // 中文显示名
+  string displayName = 3;
+  // 当前层级是否启用：平台级=平台总开关；租户级=本租户开关
+  int32 enabled = 4;
+  // 仅租户级：1=使用平台默认凭证，0=使用自身凭证
+  int32 usePlatformConfig = 5;
+  // 生效凭证是否已配置
+  bool hasConfig = 6;
+  // 仅租户级：平台是否已开启该方式
+  bool platformEnabled = 7;
+  // 仅平台级：是否为平台锁定不可关闭（password）
+  bool platformLocked = 8;
+}
+
+// Login method config list response
+message LoginMethodListRpcResponse {
+  repeated LoginMethodRpcResponse items = 1;
+}
+
+// Save platform-level login method config request
+message SavePlatformLoginMethodRpcRequest {
+  // 登录方式 code
+  string method = 1;
+  // 是否启用：0-否，1-是（password 不可关闭）
+  int32 enabled = 2;
+  // 明文凭证 JSON；空表示不修改凭证
+  string configJson = 3;
+}
+
+// List tenant-level login method configs request
+message TenantLoginMethodRpcRequest {
+  string tenantId = 1;
+}
+
+// Save tenant-level login method config request
+message SaveTenantLoginMethodRpcRequest {
+  string tenantId = 1;
+  // 登录方式 code（须平台已开启）
+  string method = 2;
+  // 是否启用：0-否，1-是
+  int32 enabled = 3;
+  // 1=使用平台默认凭证，0=使用自身 configJson
+  int32 usePlatformConfig = 4;
+  // 明文凭证 JSON（usePlatformConfig=0 时生效）；空表示不修改凭证
+  string configJson = 5;
+}
+
+// List enabled login methods request (public discovery, by tenantUid)
+message EnabledLoginMethodsRpcRequest {
+  // 对外租户标识；空返回空列表
+  string tenantUid = 1;
+}
+
+// ==================== Upload Messages ====================
+
+// Upload avatar RPC request
+message UploadAvatarRpcRequest {
+  string tenantId = 1;
+  // 头像归属用户 ID（编辑已有用户传目标 id，新建场景传操作者 id）
+  string userId = 2;
+  // 原始文件名（校验扩展名白名单：jpg/jpeg/png/gif/webp）
+  string filename = 3;
+  // 文件 MIME 类型
+  string contentType = 4;
+  // 文件内容（最大 2MB）
+  bytes data = 5;
+}
+
+// Upload avatar response
+message UploadAvatarRpcResponse {
+  // 上传后的可访问 URL
+  string url = 1;
+}
+
+// ==================== Extension Services ====================
+
+// Authentication extension RPC Service (verification code login)
+service AuthRpcServiceProtobuf {
+  rpc register(RegisterRpcRequest) returns (RegisterRpcResult);
+  rpc authenticate(LoginRpcRequest) returns (AuthResult);
+  rpc getUserById(UserByIdRequest) returns (UserRpcResponse);
+  rpc getUserByUsername(UserByUsernameRequest) returns (UserRpcResponse);
+  rpc hasPermission(PermissionCheckRequest) returns (BoolValue);
+  rpc hasRole(RoleCheckRequest) returns (BoolValue);
+  rpc getUserPermissions(UserPermissionsRequest) returns (StringListResponse);
+  rpc getUserRoles(UserRolesRequest) returns (StringListResponse);
+  rpc searchUsers(SearchUsersRequest) returns (UserPageResponse);
+  rpc refreshToken(RefreshTokenRpcRequest) returns (TokenRpcResponse);
+  rpc logout(LogoutRpcRequest) returns (OperationResult);
+  rpc changePassword(ChangePasswordRpcRequest) returns (OperationResult);
+  // 发送验证码（邮箱/手机）
+  rpc sendCode(SendCodeRpcRequest) returns (OperationResult);
+  // 验证码登录（邮箱/手机）
+  rpc loginByCode(LoginByCodeRpcRequest) returns (LoginByCodeRpcResult);
+}
+
+// OAuth login/binding orchestration RPC Service
+service OAuthRpcServiceProtobuf {
+  // 构建登录授权页 URL（state 已生成并暂存）
+  rpc buildAuthorizeUrl(OAuthAuthorizeUrlRpcRequest) returns (OAuthUrlRpcResponse);
+  // 构建绑定授权页 URL（已登录用户绑定第三方账号）
+  rpc buildBindAuthorizeUrl(OAuthBindUrlRpcRequest) returns (OAuthUrlRpcResponse);
+  // 处理回调：校验 state + 换 token + 匹配/建用户 + 签发 token（或完成绑定）
+  rpc handleCallback(OAuthCallbackRpcRequest) returns (OAuthCallbackRpcResult);
+  // 列出用户已绑定的第三方平台
+  rpc listBindings(OAuthBindingsRpcRequest) returns (OAuthBindingListRpcResponse);
+  // 解绑某第三方平台
+  rpc unbind(OAuthUnbindRpcRequest) returns (OperationResult);
+}
+
+// Email/phone binding RPC Service (account binding page)
+service ContactBindingRpcServiceProtobuf {
+  // 绑定/换绑邮箱（验证码验证通过后覆盖旧值）
+  rpc bindEmail(BindContactRpcRequest) returns (OperationResult);
+  // 解绑邮箱（清空 email 并重置验证标记）
+  rpc unbindEmail(ContactUnbindRpcRequest) returns (OperationResult);
+  // 绑定/换绑手机号（验证码验证通过后覆盖旧值）
+  rpc bindPhone(BindContactRpcRequest) returns (OperationResult);
+  // 解绑手机号（清空 phone 并重置验证标记）
+  rpc unbindPhone(ContactUnbindRpcRequest) returns (OperationResult);
+}
+
+// Login method config RPC Service (platform / tenant / public three layers)
+service LoginMethodRpcServiceProtobuf {
+  // 平台级：列出所有登录方式及平台开关与默认凭证配置状态
+  rpc listPlatformConfigs(Empty) returns (LoginMethodListRpcResponse);
+  // 平台级：保存开关与默认凭证（password 不可关闭）
+  rpc savePlatformConfig(SavePlatformLoginMethodRpcRequest) returns (OperationResult);
+  // 租户级：列出本租户可配置的登录方式及开关与凭证来源
+  rpc listTenantConfigs(TenantLoginMethodRpcRequest) returns (LoginMethodListRpcResponse);
+  // 租户级：保存本租户开关与凭证来源（method 必须平台已开启）
+  rpc saveTenantConfig(SaveTenantLoginMethodRpcRequest) returns (OperationResult);
+  // 公开：按对外租户标识返回该租户开放的登录方式列表（仅 method 名）
+  rpc listEnabledMethods(EnabledLoginMethodsRpcRequest) returns (StringListResponse);
+}
+
+// File upload RPC Service (avatar)
+service OssRpcServiceProtobuf {
+  // 上传头像，返回可访问 URL
+  rpc uploadAvatar(UploadAvatarRpcRequest) returns (UploadAvatarRpcResponse);
+}

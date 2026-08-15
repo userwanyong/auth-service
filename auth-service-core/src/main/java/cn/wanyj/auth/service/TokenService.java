@@ -1,11 +1,46 @@
 package cn.wanyj.auth.service;
 
+import cn.wanyj.auth.dto.response.TokenResponse;
+import cn.wanyj.auth.dto.response.ValidatedToken;
+
 /**
  * Token Service - 令牌服务接口
  *
  * @author wanyj
  */
 public interface TokenService {
+
+    /**
+     * Issue access/refresh tokens for a user (for RPC context)
+     * 为指定用户签发令牌（用户加载、状态与租户归属校验在 Service 层完成）
+     *
+     * @param userId 用户ID
+     * @param tenantId 租户ID（&gt;0 强制租户隔离；=0 保持"不指定租户"语义）
+     * @param expirationSeconds 有效期（秒，用于响应 expiresIn；&lt;=0 使用默认配置）
+     * @return 令牌响应（不含用户信息）
+     * @throws cn.wanyj.auth.exception.BusinessException 用户不存在/禁用/租户不匹配
+     */
+    TokenResponse issueTokens(Long userId, Long tenantId, Long expirationSeconds);
+
+    /**
+     * Validate access token and load the user with roles/permissions (for RPC context)
+     * 校验 access token（签名、黑名单、用户存在性与状态）并加载用户
+     *
+     * @param accessToken 访问令牌
+     * @return 校验结果（用户 + 过期时间）；token 无效/用户不存在或禁用返回 null
+     */
+    ValidatedToken validateAccessToken(String accessToken);
+
+    /**
+     * Revoke all tokens for a user with existence and tenant-ownership checks (for RPC context)
+     * 撤销指定用户全部令牌（含用户存在性与租户归属校验）
+     *
+     * @param userId 用户ID
+     * @param tenantId 租户ID（空则跳过归属校验，兼容旧客户端）
+     * @throws cn.wanyj.auth.exception.BusinessException 用户不存在/租户不匹配
+     */
+    void revokeAllTokensForUser(Long userId, Long tenantId);
+
 
     /**
      * Save refresh token to Redis with tenant isolation

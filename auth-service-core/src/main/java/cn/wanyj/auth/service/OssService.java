@@ -65,6 +65,50 @@ public class OssService {
         }
     }
 
+    /**
+     * 上传头像到 OSS（字节流入口，供 RPC 调用方使用），返回可访问 URL。
+     * 校验规则与 MultipartFile 入口一致：大小 ≤2MB、扩展名白名单。
+     *
+     * @param filename    原始文件名（用于扩展名校验）
+     * @param contentType 文件 MIME 类型
+     * @param data        文件内容
+     * @param tenantId    租户 ID（objectKey 隔离）
+     * @param userId      头像归属用户 ID（objectKey 隔离）
+     */
+    public String uploadAvatar(String filename, String contentType, byte[] data, Long tenantId, Long userId) {
+        OSS oss = ossProvider.getIfAvailable();
+        if (oss == null || props.getEndpoint() == null || props.getEndpoint().isBlank()) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OSS 未配置，无法上传文件");
+        }
+
+        if (data == null || data.length == 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "文件为空");
+        }
+        if (data.length > MAX_SIZE) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "文件过大，最大 2MB");
+        }
+        if (filename == null || !IMG_EXT.matcher(filename).find()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅支持 jpg/jpeg/png/gif/webp 格式");
+        }
+
+        String ext = extOf(filename);
+        String objectKey = props.getObjectPrefix() + "/" + tenantId + "/" + userId + "/"
+                + System.currentTimeMillis() + ext;
+
+        try {
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(contentType);
+            metadata.setContentLength(data.length);
+            oss.putObject(props.getBucket(), objectKey, new java.io.ByteArrayInputStream(data), metadata);
+            String url = publicUrl(objectKey);
+            log.info("Avatar uploaded: tenant={}, user={}, url={}", tenantId, userId, url);
+            return url;
+        } catch (Exception e) {
+            log.error("OSS upload failed", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "文件上传失败: " + e.getMessage());
+        }
+    }
+
     /** 拼接公开访问 URL：https://{bucket}.{endpoint去协议}/{objectKey} */
     private String publicUrl(String objectKey) {
         String host = props.getEndpoint().replaceFirst("^https?://", "");

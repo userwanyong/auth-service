@@ -1,11 +1,13 @@
 package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
+import cn.wanyj.auth.dto.response.TokenResponse;
+import cn.wanyj.auth.dto.response.ValidatedToken;
+import cn.wanyj.auth.entity.Permission;
+import cn.wanyj.auth.entity.Role;
 import cn.wanyj.auth.entity.User;
-import cn.wanyj.auth.mapper.UserMapper;
-import cn.wanyj.auth.security.JwtTokenProvider;
+import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.service.TokenService;
-import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -14,7 +16,8 @@ import java.util.stream.Collectors;
 
 /**
  * 令牌服务 RPC 实现 - Protobuf IDL 模式
- * 使用 Protobuf 定义的消息类型进行序列化
+ * <p>签发/校验/撤销的完整业务逻辑（用户加载、状态与租户归属校验）复用
+ * {@link TokenService}，本类不再直接访问 Mapper。</p>
  *
  * @author wanyj
  */
@@ -29,8 +32,6 @@ import java.util.stream.Collectors;
 public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTriple.TokenRpcServiceProtobufImplBase {
 
     private final TokenService tokenService;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final UserMapper userMapper;
 
     @Override
     public TokenRpcResponse generateToken(TokenGenerationRequest request) {
@@ -40,38 +41,17 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
             Long userId = Long.parseLong(request.getUserId());
             Long tenantId = Long.parseLong(request.getTenantId());
 
-            // tenantId > 0 时强制租户隔离；=0 保持原"不指定租户"语义
-            User user = userMapper.findByIdWithRoles(userId, tenantId > 0 ? tenantId : null);
-            if (user == null) {
-                log.error("User not found: {}", userId);
-                return TokenRpcResponse.getDefaultInstance();
-            }
-
-            if (user.getStatus() == 0) {
-                log.error("User is disabled: {}", userId);
-                return TokenRpcResponse.getDefaultInstance();
-            }
-
-            // If tenantId is provided in request, verify it matches user's tenant
-            if (tenantId > 0 && !user.getTenantId().equals(tenantId)) {
-                log.error("Tenant mismatch: user belongs to tenant {}, but request specified {}",
-                    user.getTenantId(), tenantId);
-                return TokenRpcResponse.getDefaultInstance();
-            }
-
-            String accessToken = jwtTokenProvider.generateAccessToken(user);
-            String refreshToken = jwtTokenProvider.generateRefreshToken(user);
-            tokenService.saveRefreshToken(user.getTenantId(), user.getId(), refreshToken);
-
-            long expiresIn = request.getExpiration() > 0
-                ? request.getExpiration()
-                : jwtTokenProvider.getAccessTokenExpirationSeconds();
+            // tenantId > 0 时强制租户隔离；=0 保持"不指定租户"语义（Service 层处理）
+            TokenResponse tokenResponse = tokenService.issueTokens(userId, tenantId, request.getExpiration());
 
             return TokenRpcResponse.newBuilder()
-                .setAccessToken(accessToken)
-                .setRefreshToken(refreshToken)
-                .setExpiresIn(expiresIn)
+                .setAccessToken(tokenResponse.getAccessToken())
+                .setRefreshToken(tokenResponse.getRefreshToken())
+                .setExpiresIn(tokenResponse.getExpiresIn())
                 .build();
+        } catch (BusinessException e) {
+            log.warn("Generate token failed: {}", e.getMessage());
+            return TokenRpcResponse.getDefaultInstance();
         } catch (Exception e) {
             log.error("Failed to generate token", e);
             return TokenRpcResponse.getDefaultInstance();
@@ -82,55 +62,30 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
     public TokenValidationResult parseToken(ParseTokenRpcRequest request) {
         log.info("RPC parseToken");
         try {
-            String accessToken = request.getAccessToken();
-
-            if (!jwtTokenProvider.validateAccessToken(accessToken)) {
+            ValidatedToken validated = tokenService.validateAccessToken(request.getAccessToken());
+            if (validated == null) {
                 log.warn("Token is invalid");
                 return TokenValidationResult.newBuilder()
                     .setValid(false)
                     .build();
             }
 
-            // Extract tenant_id from JWT token
-            Claims claims = jwtTokenProvider.getClaimsFromToken(accessToken);
-            Long tenantId = claims.get("tenant_id", Long.class);
-
-            // Check blacklist by jti
-            String jti = claims.getId();
-            if (jti != null && tokenService.isBlacklisted(tenantId, jti)) {
-                log.warn("Token is blacklisted: tenant={}, jti={}", tenantId, jti);
-                return TokenValidationResult.newBuilder()
-                    .setValid(false)
-                    .build();
-            }
-
-            Long userId = jwtTokenProvider.getUserIdFromToken(accessToken);
-
-            // Load user with roles and permissions
-            User user = userMapper.findByIdWithRolesAndPermissions(userId, tenantId);
-
-            if (user == null || user.getStatus() == 0) {
-                return TokenValidationResult.newBuilder()
-                    .setValid(false)
-                    .build();
-            }
-
-            long expiresAt = jwtTokenProvider.getAccessTokenExpirationSeconds() * 1000 + System.currentTimeMillis();
+            User user = validated.getUser();
 
             return TokenValidationResult.newBuilder()
                 .setValid(true)
                 .setUserId(user.getId())
                 .setUsername(user.getUsername())
-                .setTenantId(tenantId)
+                .setTenantId(user.getTenantId())
                 .addAllRoles(user.getRoles().stream()
-                    .map(r -> r.getCode())
+                    .map(Role::getCode)
                     .collect(Collectors.toList()))
                 .addAllPermissions(user.getRoles().stream()
                     .flatMap(r -> r.getPermissions().stream())
-                    .map(p -> p.getCode())
+                    .map(Permission::getCode)
                     .distinct()
                     .collect(Collectors.toList()))
-                .setExpiresAt(expiresAt)
+                .setExpiresAt(validated.getExpiresAt())
                 .build();
         } catch (Exception e) {
             log.error("Failed to parse token", e);
@@ -145,20 +100,12 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
         Long userId = Long.parseLong(request.getUserId());
         log.info("RPC revoke all tokens: userId={}, tenantId={}", userId, request.getTenantId());
         try {
-            User user = userMapper.findById(userId);
-            if (user == null) {
-                log.error("User not found: {}", userId);
-                return Empty.getDefaultInstance();
-            }
-            // 校验调用方声明的 tenantId 与用户实际归属一致（空则跳过，兼容旧客户端）
+            // tenantId 为空（旧客户端）时跳过归属校验，由 Service 层处理
             Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
-            if (tenantId != null && !tenantId.equals(user.getTenantId())) {
-                log.warn("Tenant mismatch for revokeAllTokens: user belongs to {}, request specified {}",
-                    user.getTenantId(), tenantId);
-                return Empty.getDefaultInstance();
-            }
-            tokenService.revokeAllTokens(user.getTenantId(), userId);
-            log.info("All tokens revoked for tenant={}, user={}", user.getTenantId(), userId);
+            tokenService.revokeAllTokensForUser(userId, tenantId);
+            log.info("All tokens revoked for user={}", userId);
+        } catch (BusinessException e) {
+            log.warn("Revoke tokens failed: {}", e.getMessage());
         } catch (Exception e) {
             log.error("Failed to revoke tokens for userId: {}", userId, e);
         }

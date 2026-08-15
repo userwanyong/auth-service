@@ -1,5 +1,7 @@
 package cn.wanyj.auth.service.impl;
 
+import cn.wanyj.auth.mapper.UserMapper;
+import cn.wanyj.auth.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,7 +27,8 @@ class TokenServiceImplTest {
         redisTemplate = mock(RedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        tokenService = new TokenServiceImpl(redisTemplate);
+        // issueTokens/validateAccessToken/revokeAllTokensForUser 的用例由集成环境覆盖，此处仅补齐构造依赖
+        tokenService = new TokenServiceImpl(redisTemplate, mock(UserMapper.class), mock(JwtTokenProvider.class));
     }
 
     @Test

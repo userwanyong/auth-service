@@ -2,8 +2,10 @@ package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.ChangePasswordRequest;
+import cn.wanyj.auth.dto.request.LoginByCodeRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
 import cn.wanyj.auth.dto.request.RegisterRequest;
+import cn.wanyj.auth.dto.request.SendCodeRequest;
 import cn.wanyj.auth.dto.response.PageResponse;
 import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
@@ -338,6 +340,71 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
             return OperationResult.newBuilder()
                 .setSuccess(false)
                 .setMessage("密码修改失败")
+                .build();
+        }
+    }
+
+    @Override
+    public OperationResult sendCode(SendCodeRpcRequest request) {
+        log.info("RPC sendCode: tenantUid={}, method={}", request.getTenantUid(), request.getMethod());
+        try {
+            authService.sendCode(SendCodeRequest.builder()
+                .tenantUid(request.getTenantUid())
+                .method(request.getMethod())
+                .target(request.getTarget())
+                .build());
+
+            return OperationResult.newBuilder()
+                .setSuccess(true)
+                .setMessage("验证码已发送")
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Send code failed: {}", e.getMessage());
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage(e.getMessage())
+                .build();
+        } catch (Exception e) {
+            log.error("Send code error", e);
+            return OperationResult.newBuilder()
+                .setSuccess(false)
+                .setMessage("验证码发送失败")
+                .build();
+        }
+    }
+
+    @Override
+    public LoginByCodeRpcResult loginByCode(LoginByCodeRpcRequest request) {
+        log.info("RPC loginByCode: tenantUid={}, method={}", request.getTenantUid(), request.getMethod());
+        try {
+            TokenResponse tokenResponse = authService.loginByCode(LoginByCodeRequest.builder()
+                .tenantUid(request.getTenantUid())
+                .method(request.getMethod())
+                .target(request.getTarget())
+                .code(request.getCode())
+                .build());
+
+            return LoginByCodeRpcResult.newBuilder()
+                .setSuccess(true)
+                .setMessage("登录成功")
+                .setToken(TokenRpcResponse.newBuilder()
+                    .setAccessToken(tokenResponse.getAccessToken())
+                    .setRefreshToken(tokenResponse.getRefreshToken())
+                    .setExpiresIn(tokenResponse.getExpiresIn())
+                    .build())
+                .setUser(UserProtobufConverter.convertToProtobuf(tokenResponse.getUser()))
+                .build();
+        } catch (BusinessException e) {
+            log.warn("Login by code failed: {}", e.getMessage());
+            return LoginByCodeRpcResult.newBuilder()
+                .setSuccess(false)
+                .setMessage(e.getMessage())
+                .build();
+        } catch (Exception e) {
+            log.error("Login by code error", e);
+            return LoginByCodeRpcResult.newBuilder()
+                .setSuccess(false)
+                .setMessage("登录失败")
                 .build();
         }
     }
