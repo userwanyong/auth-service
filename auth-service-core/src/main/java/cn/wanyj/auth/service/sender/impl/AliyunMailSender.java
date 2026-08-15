@@ -50,6 +50,8 @@ public class AliyunMailSender implements MailSender {
             request.setAccountName(accountName);
             request.setFromAlias(fromAlias);
             request.setAddressType(1);
+            // DirectMail 必填参数：false=不使用回信地址（缺失会报 MissingReplyToAddress）
+            request.setReplyToAddress(false);
             request.setToAddress(to);
             request.setSubject("登录验证码");
             request.setHtmlBody("<p>您的登录验证码是：<strong style=\"font-size:20px\">" + code + "</strong>，5 分钟内有效。</p>");
