@@ -51,6 +51,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Jakarta Mail (SMTP 邮箱验证码：QQ/163/企业邮箱等) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

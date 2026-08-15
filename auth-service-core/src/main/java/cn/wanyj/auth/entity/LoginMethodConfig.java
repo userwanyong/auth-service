@@ -33,7 +33,7 @@ public class LoginMethodConfig {
     private Long tenantId;
 
     /**
-     * 登录方式：password / email:aliyun / sms:aliyun / oauth:gitee / oauth:microsoft / oauth:github
+     * 登录方式：password / email:aliyun / email:smtp / sms:aliyun / oauth:gitee / oauth:github
      */
     private String method;
 

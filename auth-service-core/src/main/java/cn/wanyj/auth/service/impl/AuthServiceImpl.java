@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -61,7 +62,8 @@ public class AuthServiceImpl implements AuthService {
     private final CodeService codeService;
     private final CodeRateLimiter codeRateLimiter;
     private final LoginMethodConfigService loginMethodConfigService;
-    private final MailSender mailSender;
+    /** 邮件发送器集合（按 method 的 vendor 段分发，同 OAuthLoginService 的 providers 模式） */
+    private final List<MailSender> mailSenders;
     private final SmsSender smsSender;
     /** 解析登录方式配置 JSON（codeTtlMinutes 等），无需 Spring 容器托管 */
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper =
@@ -214,12 +216,29 @@ public class AuthServiceImpl implements AuthService {
         long ttlMinutes = resolveTtlMinutes(tenantId, request.getMethod(), config);
         String code = codeService.generateAndStore(tenantId, request.getMethod(), request.getTarget(), ttlMinutes);
         if ("email".equals(category)) {
+            // 按 method 的 vendor 段分发到对应邮件发送实现（email:aliyun / email:smtp）
+            MailSender sender = findMailSender(method.getVendor());
             // 有效期（分钟）传给发送方渲染自定义模板的 {minutes} 占位符
-            mailSender.send(request.getTarget(), code, (int) ttlMinutes, config);
+            sender.send(request.getTarget(), code, (int) ttlMinutes, config);
         } else {
             smsSender.send(request.getTarget(), code, config);
         }
         log.info("Login code sent: tenant={}, method={}, ttl={}min", tenantId, request.getMethod(), ttlMinutes);
+    }
+
+    /**
+     * 按 vendor 查找邮件发送实现（email:aliyun → aliyun，email:smtp → smtp）。
+     * 未命中说明枚举注册了方式但缺少对应 Sender 实现，属部署缺陷，直接拒绝而非回退，
+     * 避免验证码已写入 Redis 却发不出去
+     */
+    private MailSender findMailSender(String vendor) {
+        return mailSenders.stream()
+                .filter(s -> s.getVendor().equals(vendor))
+                .findFirst()
+                .orElseThrow(() -> {
+                    log.error("No MailSender implementation for vendor: {}", vendor);
+                    return new BusinessException(ErrorCode.LOGIN_METHOD_NOT_SUPPORTED);
+                });
     }
 
     /** codeTtlMinutes 配置允许的范围（分钟），见 {@link CodeService} */

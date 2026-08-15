@@ -53,16 +53,22 @@ class AuthServiceImplTest {
     @Mock private CodeService codeService;
     @Mock private CodeRateLimiter codeRateLimiter;
     @Mock private LoginMethodConfigService loginMethodConfigService;
-    @Mock private MailSender mailSender;
+    /** 两个邮件发送实现（vendor 分发：email:aliyun / email:smtp） */
+    @Mock private MailSender aliyunMailSender;
+    @Mock private MailSender smtpMailSender;
     @Mock private SmsSender smsSender;
 
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
+        // lenient：不发码的用例不会触发 vendor 查找
+        lenient().when(aliyunMailSender.getVendor()).thenReturn("aliyun");
+        lenient().when(smtpMailSender.getVendor()).thenReturn("smtp");
         authService = new AuthServiceImpl(userMapper, passwordEncoder, jwtTokenProvider,
                 tokenService, tenantService, loginRateLimiter, uidGenerator,
-                codeService, codeRateLimiter, loginMethodConfigService, mailSender, smsSender);
+                codeService, codeRateLimiter, loginMethodConfigService,
+                java.util.List.of(aliyunMailSender, smtpMailSender), smsSender);
     }
 
     /** login 前置链：tenantUid 定位租户 + 密码登录开关 */
@@ -186,7 +192,7 @@ class AuthServiceImplTest {
 
         // Redis TTL 与邮件模板渲染都用配置的 10 分钟
         verify(codeService).generateAndStore(100L, "email:aliyun", "x@y.com", 10L);
-        verify(mailSender).send(eq("x@y.com"), eq("123456"), eq(10), anyString());
+        verify(aliyunMailSender).send(eq("x@y.com"), eq("123456"), eq(10), anyString());
     }
 
     @Test
@@ -197,7 +203,7 @@ class AuthServiceImplTest {
         authService.sendCode(sendCodeRequest());
 
         verify(codeService).generateAndStore(100L, "email:aliyun", "x@y.com", 5L);
-        verify(mailSender).send(eq("x@y.com"), eq("123456"), eq(5), anyString());
+        verify(aliyunMailSender).send(eq("x@y.com"), eq("123456"), eq(5), anyString());
     }
 
     @Test
@@ -217,6 +223,28 @@ class AuthServiceImplTest {
         authService.sendCode(sendCodeRequest());
 
         verify(codeService).generateAndStore(100L, "email:aliyun", "x@y.com", 5L);
+    }
+
+    @Test
+    void sendCode_shouldDispatchToSmtpSenderForSmtpMethod() {
+        // email:smtp 方式走 SmtpMailSender（vendor=smtp），不触碰阿里云发送器
+        when(tenantService.getTenantByUid("t-uid"))
+                .thenReturn(Tenant.builder().id(100L).status(1).build());
+        when(loginMethodConfigService.isEnabled(100L, "email:smtp")).thenReturn(true);
+        when(codeRateLimiter.allowSend("x@y.com")).thenReturn(true);
+        when(loginMethodConfigService.getEffectiveConfig(100L, "email:smtp"))
+                .thenReturn("{\"host\":\"smtp.qq.com\",\"username\":\"a@qq.com\",\"password\":\"pw\"}");
+        when(codeService.getTtlMinutes()).thenReturn(5L);
+        when(codeService.generateAndStore(eq(100L), eq("email:smtp"), eq("x@y.com"), anyLong()))
+                .thenReturn("123456");
+
+        authService.sendCode(cn.wanyj.auth.dto.request.SendCodeRequest.builder()
+                .tenantUid("t-uid").method("email:smtp").target("x@y.com").build());
+
+        verify(smtpMailSender).send(eq("x@y.com"), eq("123456"), eq(5), anyString());
+        verify(aliyunMailSender, never()).send(anyString(), anyString(), anyInt(), anyString());
+        // 验证码按完整 method 入 Redis（与验码侧 key 对齐）
+        verify(codeService).generateAndStore(100L, "email:smtp", "x@y.com", 5L);
     }
 
     @Test

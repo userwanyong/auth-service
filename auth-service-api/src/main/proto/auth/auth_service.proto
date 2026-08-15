@@ -414,7 +414,7 @@ message Empty {}
 message SendCodeRpcRequest {
   // 对外租户标识
   string tenantUid = 1;
-  // 登录方式：email:aliyun / sms:aliyun
+  // 登录方式：email:aliyun / email:smtp / sms:aliyun
   string method = 2;
   // 接收目标：邮箱地址或手机号
   string target = 3;
@@ -424,7 +424,7 @@ message SendCodeRpcRequest {
 message LoginByCodeRpcRequest {
   // 对外租户标识
   string tenantUid = 1;
-  // 登录方式：email:aliyun / sms:aliyun
+  // 登录方式：email:aliyun / email:smtp / sms:aliyun
   string method = 2;
   // 接收目标：邮箱地址或手机号
   string target = 3;
@@ -522,7 +522,7 @@ message OAuthUnbindRpcRequest {
 message BindContactRpcRequest {
   string userId = 1;
   string tenantId = 2;
-  // 登录方式：email:aliyun（绑定邮箱）/ sms:aliyun（绑定手机），须与发码时一致
+  // 登录方式：email:aliyun / email:smtp（绑定邮箱）/ sms:aliyun（绑定手机），须与发码时一致
   string method = 3;
   // 目标：邮箱地址或手机号
   string target = 4;

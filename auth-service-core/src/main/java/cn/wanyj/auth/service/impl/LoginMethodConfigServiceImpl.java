@@ -163,13 +163,20 @@ public class LoginMethodConfigServiceImpl implements LoginMethodConfigService {
     @Override
     @Transactional
     public void saveTenantConfig(Long tenantId, String method, LoginMethodConfigSaveRequest request) {
-        LoginMethod.requireSupported(method);
+        LoginMethod requireSupported = LoginMethod.fromCode(method);
+        if (requireSupported == null) {
+            throw new BusinessException(ErrorCode.LOGIN_METHOD_NOT_SUPPORTED);
+        }
         // 校验平台已开启该方式（平台未开则租户不可配）
-        boolean platformEnabled = LoginMethod.PASSWORD.getCode().equals(method) || isPlatformRowEnabled(method);
+        boolean platformEnabled = requireSupported == LoginMethod.PASSWORD || isPlatformRowEnabled(method);
         if (!platformEnabled) {
             throw new BusinessException(ErrorCode.LOGIN_METHOD_DISABLED, "平台未开启该登录方式");
         }
         int enabled = request.getEnabled() != null ? request.getEnabled() : 0;
+        // 邮箱类互斥：租户内同类别（email）同时只允许启用一种，确保登录/绑定/换绑链路唯一
+        if (enabled == 1) {
+            rejectConflictingEmailMethod(tenantId, requireSupported);
+        }
         int usePlatform = request.getUsePlatformConfig() != null ? request.getUsePlatformConfig() : 1;
         // 仅当租户选择用自己的凭证时才保存 configJson（与已有明文按键合并）
         String cipher = (usePlatform == 0 && isNonEmpty(request.getConfigJson()))
@@ -249,6 +256,27 @@ public class LoginMethodConfigServiceImpl implements LoginMethodConfigService {
             throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFIG_INVALID,
                     "codeTtlMinutes 须为 " + CodeService.CODE_TTL_MIN + "~"
                             + CodeService.CODE_TTL_MAX + " 的整数（分钟）");
+        }
+    }
+
+    /**
+     * 邮箱类互斥校验：租户内同类别（email）同时只允许启用一种邮箱登录方式
+     * （如 email:aliyun 与 email:smtp 不能并存），否则登录页/绑定页无法确定
+     * 唯一生效通道。按 isEnabled 实际生效语义判断——平台侧已关闭的旧方式
+     * 不构成冲突，可直接启用新方式。仅 email 类别受限，sms/oauth 不受影响。
+     */
+    private void rejectConflictingEmailMethod(Long tenantId, LoginMethod target) {
+        if (!"email".equals(target.getCategory())) {
+            return;
+        }
+        for (LoginMethod other : LoginMethod.values()) {
+            if (other == target || !"email".equals(other.getCategory())) {
+                continue;
+            }
+            if (isEnabled(tenantId, other.getCode())) {
+                throw new BusinessException(ErrorCode.LOGIN_METHOD_CONFLICT,
+                        "请先禁用：" + other.getDisplayName());
+            }
         }
     }
 

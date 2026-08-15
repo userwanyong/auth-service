@@ -16,6 +16,7 @@ public enum LoginMethod {
 
     PASSWORD("password", "password", "账号密码"),
     EMAIL_ALIYUN("email:aliyun", "email", "邮箱验证码（阿里云）"),
+    EMAIL_SMTP("email:smtp", "email", "邮箱验证码（SMTP 自有邮箱）"),
     SMS_ALIYUN("sms:aliyun", "sms", "手机验证码（阿里云）"),
     OAUTH_GITEE("oauth:gitee", "oauth", "Gitee 登录"),
     OAUTH_GITHUB("oauth:github", "oauth", "GitHub 登录");
@@ -36,6 +37,15 @@ public enum LoginMethod {
 
     public String getCategory() {
         return category;
+    }
+
+    /**
+     * 服务商标识：method code 冒号后的 vendor 段（如 email:aliyun → aliyun），
+     * 用于发送器/Provider 分发；password 无 vendor 段，返回自身
+     */
+    public String getVendor() {
+        int idx = code.indexOf(':');
+        return idx < 0 ? code : code.substring(idx + 1);
     }
 
     public String getDisplayName() {

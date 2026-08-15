@@ -1187,6 +1187,22 @@
             { key: 'subject', label: '邮件主题（可选）', type: 'text', required: false, optional: true, placeholder: '登录验证码' },
             { key: 'template', label: '正文模板（可选，HTML）', type: 'textarea', required: false, optional: true, placeholder: '支持 {code}（验证码）与 {minutes}（有效分钟数，跟随上方配置）占位符，必须包含 {code}，否则使用默认文案。例：<p>您的验证码是：<strong>{code}</strong>，{minutes} 分钟内有效。</p>' }
         ],
+        'email:smtp': [
+            { key: 'host', label: 'SMTP 服务器 host', type: 'text', required: true, placeholder: '如 smtp.qq.com / smtp.163.com / smtp.exmail.qq.com' },
+            { key: 'port', label: '端口 port', type: 'text', required: false, placeholder: '默认按加密方式：SSL 465 / STARTTLS 587', optional: true },
+            { key: 'username', label: 'SMTP 账号 username', type: 'text', required: true, placeholder: '发件邮箱地址（如 xxx@qq.com）' },
+            { key: 'password', label: 'SMTP 密码/授权码', type: 'password', required: true, placeholder: 'QQ/163 需使用页面生成的授权码，非登录密码' },
+            { key: 'encryption', label: '加密方式', type: 'select', required: false, optional: true, blankLabel: '默认 SSL（465）', options: [
+                { value: 'ssl', label: 'SSL（465，QQ/163/企业邮箱常用）' },
+                { value: 'starttls', label: 'STARTTLS（587）' },
+                { value: 'none', label: '不加密（25，仅内网）' }
+            ] },
+            { key: 'from', label: '发件地址 from', type: 'text', required: false, placeholder: '默认同 SMTP 账号', optional: true },
+            { key: 'fromAlias', label: '发件人别名', type: 'text', required: false, placeholder: 'Auth Service', optional: true },
+            { key: 'codeTtlMinutes', label: '验证码有效期（分钟，可选）', type: 'text', required: false, optional: true, placeholder: '默认 5，范围 1~30' },
+            { key: 'subject', label: '邮件主题（可选）', type: 'text', required: false, optional: true, placeholder: '登录验证码' },
+            { key: 'template', label: '正文模板（可选，HTML）', type: 'textarea', required: false, optional: true, placeholder: '支持 {code}（验证码）与 {minutes}（有效分钟数，跟随上方配置）占位符，必须包含 {code}，否则使用默认文案。例：<p>您的验证码是：<strong>{code}</strong>，{minutes} 分钟内有效。</p>' }
+        ],
         'sms:aliyun': [
             { key: 'accessKeyId', label: 'AccessKey ID', type: 'text', required: true, placeholder: 'LTAI...' },
             { key: 'accessKeySecret', label: 'AccessKey Secret', type: 'password', required: true },
@@ -1300,7 +1316,11 @@
         }
         container.innerHTML = fields.map(f => {
             const placeholder = escapeHtml(f.placeholder || (f.default ? '默认 ' + f.default : ''));
-            const control = f.type === 'textarea'
+            // select 默认选空项（不修改/用默认），与文本框"留空保留原值"的语义一致
+            const control = f.type === 'select'
+                ? `<select class="form-control" data-field="${f.key}"><option value="">${escapeHtml(f.blankLabel || '不修改')}</option>${(f.options || []).map(o =>
+                    `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')}</select>`
+                : f.type === 'textarea'
                 ? `<textarea class="form-control" data-field="${f.key}" rows="5" placeholder="${placeholder}" autocomplete="off"></textarea>`
                 : `<input type="${f.type}" class="form-control" data-field="${f.key}" placeholder="${placeholder}" autocomplete="off">`;
             return `

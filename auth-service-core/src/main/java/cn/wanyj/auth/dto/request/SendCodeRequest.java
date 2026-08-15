@@ -22,7 +22,7 @@ public class SendCodeRequest {
     private String tenantUid;
 
     /**
-     * 登录方式：email:aliyun / sms:aliyun
+     * 登录方式：email:aliyun / email:smtp / sms:aliyun
      */
     @NotBlank(message = "登录方式不能为空")
     private String method;

@@ -9,12 +9,18 @@
     let activeMethod = 'password';        // 当前选中的登录方式
     let enabledMethods = ['password'];    // 当前租户对用户开放的方式
 
-    // 登录方式 → Tab/Pane 定义
+    // 登录方式类别 → Tab/Pane 定义；具体 method（如 email:aliyun / email:smtp）
+    // 在渲染时按租户启用方式动态解析（同类互斥启用，邮箱/手机各取其一）
     const TAB_DEFS = [
-        { method: 'password', label: '账号密码', pane: 'pane-password' },
-        { method: 'email:aliyun', label: '邮箱', pane: 'pane-email' },
-        { method: 'sms:aliyun', label: '手机', pane: 'pane-sms' }
+        { category: 'password', label: '账号密码', pane: 'pane-password' },
+        { category: 'email', label: '邮箱', pane: 'pane-email' },
+        { category: 'sms', label: '手机', pane: 'pane-sms' }
     ];
+
+    /** 取指定类别在当前租户实际启用的 method（email:aliyun / email:smtp / ...） */
+    function methodOf(category) {
+        return enabledMethods.find(m => m === category || m.startsWith(category + ':'));
+    }
 
     function init() {
         // OAuth 回调：URL fragment 形如 #oauth=success&accessToken=...&refreshToken=...
@@ -105,12 +111,12 @@
         const phoneBtn = document.getElementById('sendPhoneCodeBtn');
         if (emailBtn) {
             emailBtn.addEventListener('click', () => {
-                sendCode('email:aliyun', document.getElementById('emailInput').value.trim(), 'sendEmailCodeBtn');
+                sendCode(methodOf('email'), document.getElementById('emailInput').value.trim(), 'sendEmailCodeBtn');
             });
         }
         if (phoneBtn) {
             phoneBtn.addEventListener('click', () => {
-                sendCode('sms:aliyun', document.getElementById('phoneInput').value.trim(), 'sendPhoneCodeBtn');
+                sendCode(methodOf('sms'), document.getElementById('phoneInput').value.trim(), 'sendPhoneCodeBtn');
             });
         }
     }
@@ -119,6 +125,10 @@
         const tenantUid = document.getElementById('loginTenantId').value;
         if (!tenantUid) {
             Toast.error('请先选择租户');
+            return;
+        }
+        if (!method) {
+            Toast.error('该登录方式当前不可用，请刷新重试');
             return;
         }
         if (!target) {
@@ -204,11 +214,19 @@
     }
 
     /**
-     * 渲染登录方式 Tab，并切换到可用方式（active 不可用时回退首个）
+     * 渲染登录方式 Tab，并切换到可用方式（active 不可用时回退首个）。
+     * Tab 定义按类别解析出该租户实际启用的 method（email 可能是 aliyun 或 smtp 通道）
      */
     function renderTabs(methods) {
         const tabsEl = document.getElementById('loginTabs');
-        const visible = TAB_DEFS.filter(t => methods.includes(t.method));
+        const visible = TAB_DEFS
+            .map(def => {
+                const method = def.category === 'password'
+                    ? (methods.includes('password') ? 'password' : null)
+                    : methods.find(m => m.startsWith(def.category + ':'));
+                return method ? { method, label: def.label, pane: def.pane } : null;
+            })
+            .filter(Boolean);
         tabsEl.innerHTML = visible.map(t =>
             `<button type="button" class="login-tab${t.method === activeMethod ? ' active' : ''}" data-method="${t.method}" data-pane="${t.pane}">${t.label}</button>`
         ).join('');

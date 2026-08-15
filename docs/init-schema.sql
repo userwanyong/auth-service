@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
 CREATE TABLE IF NOT EXISTS `login_method_config` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `tenant_id` BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID（0=平台级默认配置）',
-  `method` VARCHAR(32) NOT NULL COMMENT '登录方式：password/email:aliyun/sms:aliyun/oauth:gitee/oauth:microsoft/oauth:github',
+  `method` VARCHAR(32) NOT NULL COMMENT '登录方式：password/email:aliyun/email:smtp/sms:aliyun/oauth:gitee/oauth:github（同类 email 租户级互斥，平台级可并存）',
   `enabled` TINYINT NOT NULL DEFAULT 0 COMMENT '是否启用：0-否，1-是',
   `use_platform_config` TINYINT NOT NULL DEFAULT 1 COMMENT '仅租户行有效：1=用平台默认凭证，0=用自身config_json',
   `config_json` TEXT COMMENT '该方式的凭证配置（整段AES加密密文，结构因method而异）',

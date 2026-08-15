@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 public class BindContactRequest {
 
     /**
-     * 登录方式：email:aliyun / sms:aliyun（须与发送验证码时的 method 一致）
+     * 登录方式：email:aliyun / email:smtp（绑定邮箱）/ sms:aliyun（绑定手机），须与发送验证码时的 method 一致
      */
     @NotBlank(message = "登录方式不能为空")
     private String method;

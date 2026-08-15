@@ -52,7 +52,8 @@ public enum ErrorCode {
     LOGIN_METHOD_DISABLED(3001, "该登录方式未启用"),
     LOGIN_METHOD_NOT_FOUND(3002, "登录方式配置不存在"),
     LOGIN_METHOD_CONFIG_INVALID(3003, "登录方式凭证配置无效"),
-    LOGIN_METHOD_NOT_SUPPORTED(3004, "不支持的登录方式");
+    LOGIN_METHOD_NOT_SUPPORTED(3004, "不支持的登录方式"),
+    LOGIN_METHOD_CONFLICT(3005, "同类登录方式已启用");
 
     private final int code;
     private final String message;
