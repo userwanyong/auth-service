@@ -479,6 +479,7 @@ public class AuthServiceImpl implements AuthService {
                 .avatar(user.getAvatar())
                 .status(user.getStatus())
                 .emailVerified(user.getEmailVerified())
+                .phoneVerified(user.getPhoneVerified())
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .roles(roles)

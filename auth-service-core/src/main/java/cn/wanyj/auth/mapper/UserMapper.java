@@ -34,6 +34,12 @@ public interface UserMapper {
     User findByEmail(@Param("email") String email, @Param("tenantId") Long tenantId);
 
     /**
+     * Find user by phone and tenant id
+     * 根据手机号和租户ID查找用户（绑定手机号唯一性检查用）
+     */
+    User findByPhone(@Param("phone") String phone, @Param("tenantId") Long tenantId);
+
+    /**
      * Find user by username or email and tenant id
      * 根据用户名或邮箱和租户ID查找用户
      */

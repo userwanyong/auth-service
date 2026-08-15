@@ -828,3 +828,38 @@ body {
         flex-wrap: wrap;
     }
 }
+
+/* ===== 账号绑定：验证码行（与 login.css 同构） ===== */
+.code-row {
+    display: flex;
+    gap: 10px;
+}
+
+.code-row .form-control {
+    flex: 1;
+}
+
+.btn-code {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 110px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--primary-color);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-code:hover:not(:disabled) {
+    border-color: var(--primary-color);
+}
+
+.btn-code:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

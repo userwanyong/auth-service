@@ -32,6 +32,7 @@ public enum ErrorCode {
     OLD_PASSWORD_WRONG(1012, "旧密码错误"),
     INVALID_EMAIL_FORMAT(1013, "邮箱格式不正确"),
     INVALID_PHONE_FORMAT(1014, "手机号格式不正确"),
+    PHONE_EXISTS(1020, "手机号已被使用"),
 
     // Tenant errors - 租户错误
     INVALID_TENANT(1015, "租户无效或不存在"),

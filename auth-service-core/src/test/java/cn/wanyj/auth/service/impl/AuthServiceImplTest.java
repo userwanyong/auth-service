@@ -5,14 +5,20 @@ import cn.wanyj.auth.dto.request.LoginRequest;
 import cn.wanyj.auth.dto.request.RegisterRequest;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.entity.Role;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.entity.User;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.security.JwtTokenProvider;
+import cn.wanyj.auth.service.CodeRateLimiter;
+import cn.wanyj.auth.service.CodeService;
+import cn.wanyj.auth.service.LoginMethodConfigService;
 import cn.wanyj.auth.service.LoginRateLimiter;
 import cn.wanyj.auth.service.TokenService;
 import cn.wanyj.auth.service.TenantService;
+import cn.wanyj.auth.service.sender.MailSender;
+import cn.wanyj.auth.service.sender.SmsSender;
 import io.github.xiapxx.uid.generator.api.UidGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,23 +48,37 @@ class AuthServiceImplTest {
     @Mock private TenantService tenantService;
     @Mock private LoginRateLimiter loginRateLimiter;
     @Mock private UidGenerator uidGenerator;
+    @Mock private CodeService codeService;
+    @Mock private CodeRateLimiter codeRateLimiter;
+    @Mock private LoginMethodConfigService loginMethodConfigService;
+    @Mock private MailSender mailSender;
+    @Mock private SmsSender smsSender;
 
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         authService = new AuthServiceImpl(userMapper, passwordEncoder, jwtTokenProvider,
-                tokenService, tenantService, loginRateLimiter, uidGenerator);
+                tokenService, tenantService, loginRateLimiter, uidGenerator,
+                codeService, codeRateLimiter, loginMethodConfigService, mailSender, smsSender);
+    }
+
+    /** login 前置链：tenantUid 定位租户 + 密码登录开关 */
+    private void stubLoginPrerequisites() {
+        when(tenantService.getTenantByUid("t-uid"))
+                .thenReturn(Tenant.builder().id(100L).status(1).build());
+        when(loginMethodConfigService.isEnabled(100L, "password")).thenReturn(true);
     }
 
     @Test
     void login_shouldThrowWhenRateLimited() {
+        stubLoginPrerequisites();
         when(loginRateLimiter.allowAttempt(100L, "testuser")).thenReturn(false);
 
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("password");
-        request.setTenantId(100L);
+        request.setTenantUid("t-uid");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(request));
         assertEquals(ErrorCode.LOGIN_RATE_LIMITED.getCode(), ex.getCode());
@@ -66,13 +86,14 @@ class AuthServiceImplTest {
 
     @Test
     void login_shouldThrowWhenUserNotFound() {
+        stubLoginPrerequisites();
         when(loginRateLimiter.allowAttempt(100L, "testuser")).thenReturn(true);
         when(userMapper.findByUsernameOrEmailWithRolesAndPermissions("testuser", 100L)).thenReturn(null);
 
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("password");
-        request.setTenantId(100L);
+        request.setTenantUid("t-uid");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(request));
         assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), ex.getCode());
@@ -80,6 +101,7 @@ class AuthServiceImplTest {
 
     @Test
     void login_shouldThrowWhenPasswordWrong() {
+        stubLoginPrerequisites();
         when(loginRateLimiter.allowAttempt(100L, "testuser")).thenReturn(true);
         User user = createTestUser();
         when(userMapper.findByUsernameOrEmailWithRolesAndPermissions("testuser", 100L)).thenReturn(user);
@@ -88,7 +110,7 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("wrongpass");
-        request.setTenantId(100L);
+        request.setTenantUid("t-uid");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(request));
         assertEquals(ErrorCode.INVALID_CREDENTIALS.getCode(), ex.getCode());
@@ -96,6 +118,7 @@ class AuthServiceImplTest {
 
     @Test
     void login_shouldSucceedAndResetRateLimit() {
+        stubLoginPrerequisites();
         when(loginRateLimiter.allowAttempt(100L, "testuser")).thenReturn(true);
         User user = createTestUser();
         when(userMapper.findByUsernameOrEmailWithRolesAndPermissions("testuser", 100L)).thenReturn(user);
@@ -107,7 +130,7 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("password");
-        request.setTenantId(100L);
+        request.setTenantUid("t-uid");
 
         var result = authService.login(request);
         assertNotNull(result);

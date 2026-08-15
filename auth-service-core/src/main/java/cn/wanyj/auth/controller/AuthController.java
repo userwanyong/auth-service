@@ -1,5 +1,6 @@
 package cn.wanyj.auth.controller;
 
+import cn.wanyj.auth.dto.request.BindContactRequest;
 import cn.wanyj.auth.dto.request.ChangePasswordRequest;
 import cn.wanyj.auth.dto.request.LoginByCodeRequest;
 import cn.wanyj.auth.dto.request.LoginRequest;
@@ -10,6 +11,7 @@ import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.exception.ApiResponse;
 import cn.wanyj.auth.security.SecurityUtils;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.service.ContactBindingService;
 import cn.wanyj.auth.entity.UserOauth;
 import cn.wanyj.auth.service.oauth.OAuthCallbackResult;
 import cn.wanyj.auth.service.oauth.OAuthLoginService;
@@ -37,6 +39,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final OAuthLoginService oAuthLoginService;
+    private final ContactBindingService contactBindingService;
 
     /**
      * User registration (auto-login)
@@ -150,6 +153,46 @@ public class AuthController {
         Long tenantId = SecurityUtils.getCurrentTenantId();
         oAuthLoginService.unbind(tenantId, userId, provider);
         return ResponseEntity.ok(ApiResponse.success(200, "解绑成功", null));
+    }
+
+    /**
+     * 绑定/换绑邮箱（验证码验证后覆盖旧值）
+     * POST /api/auth/me/email
+     */
+    @PostMapping("/me/email")
+    public ResponseEntity<ApiResponse<Void>> bindEmail(@Valid @RequestBody BindContactRequest request) {
+        contactBindingService.bindEmail(SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentTenantId(), request);
+        return ResponseEntity.ok(ApiResponse.success(200, "邮箱绑定成功", null));
+    }
+
+    /**
+     * 解绑邮箱
+     * DELETE /api/auth/me/email
+     */
+    @DeleteMapping("/me/email")
+    public ResponseEntity<ApiResponse<Void>> unbindEmail() {
+        contactBindingService.unbindEmail(SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentTenantId());
+        return ResponseEntity.ok(ApiResponse.success(200, "邮箱解绑成功", null));
+    }
+
+    /**
+     * 绑定/换绑手机号（验证码验证后覆盖旧值）
+     * POST /api/auth/me/phone
+     */
+    @PostMapping("/me/phone")
+    public ResponseEntity<ApiResponse<Void>> bindPhone(@Valid @RequestBody BindContactRequest request) {
+        contactBindingService.bindPhone(SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentTenantId(), request);
+        return ResponseEntity.ok(ApiResponse.success(200, "手机号绑定成功", null));
+    }
+
+    /**
+     * 解绑手机号
+     * DELETE /api/auth/me/phone
+     */
+    @DeleteMapping("/me/phone")
+    public ResponseEntity<ApiResponse<Void>> unbindPhone() {
+        contactBindingService.unbindPhone(SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentTenantId());
+        return ResponseEntity.ok(ApiResponse.success(200, "手机号解绑成功", null));
     }
 
     /**

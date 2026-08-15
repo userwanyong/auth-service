@@ -431,7 +431,19 @@ const API = (function() {
         getBindUrl: (provider) => get('/auth/oauth/' + encodeURIComponent(provider) + '/bind'),
 
         /** 解绑某第三方平台 */
-        unbind: (provider) => del('/auth/me/oauth/' + encodeURIComponent(provider))
+        unbind: (provider) => del('/auth/me/oauth/' + encodeURIComponent(provider)),
+
+        /** 绑定/换绑邮箱（验证码验证后覆盖旧值） */
+        bindEmail: (method, target, code) => postJson('/auth/me/email', { method, target, code }),
+
+        /** 解绑邮箱 */
+        unbindEmail: () => del('/auth/me/email'),
+
+        /** 绑定/换绑手机号（验证码验证后覆盖旧值） */
+        bindPhone: (method, target, code) => postJson('/auth/me/phone', { method, target, code }),
+
+        /** 解绑手机号 */
+        unbindPhone: () => del('/auth/me/phone')
     };
 
     // Public API

@@ -319,6 +319,8 @@
         setupTenantModal();
         // Login method modal
         setupLoginMethodModal();
+        // Bind contact modal（邮箱/手机号）
+        setupBindContactModal();
     }
 
     function openModal(modalId) {
@@ -403,8 +405,8 @@
                 <td>${user.id}</td>
                 <td>${user.avatar ? `<img src="${escapeHtml(user.avatar)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">` : '-'}</td>
                 <td>${escapeHtml(user.username)}</td>
-                <td>${escapeHtml(user.email || '-')}${verifiedBadge(user.emailVerified)}</td>
-                <td>${escapeHtml(user.phone || '-')}${verifiedBadge(user.phoneVerified)}</td>
+                <td>${escapeHtml(user.email || '-')}${verifiedBadge(user.email)}</td>
+                <td>${escapeHtml(user.phone || '-')}${verifiedBadge(user.phone)}</td>
                 <td>${escapeHtml(user.nickname || '-')}</td>
                 <td>${user.status === 1 ?
                     '<span class="badge badge-success">启用</span>' :
@@ -561,13 +563,14 @@
                 await API.Users.update(id, {
                     username,
                     password: password || null,
-                    email: email || null,
-                    phone: phone || null,
-                    nickname: nickname || null,
-                    realName: realName || null,
+                    // 可清空字段直接传值：空串=清空（后端语义），null=不改
+                    email,
+                    phone,
+                    nickname,
+                    realName,
                     gender,
-                    birthday: birthday || null,
-                    avatar: avatar || null,
+                    birthday,
+                    avatar,
                     status
                 });
                 Toast.success('用户更新成功');
@@ -622,8 +625,8 @@
                 ['租户ID', user.tenantId],
                 ['用户名', escapeHtml(user.username)],
                 ['真实姓名', escapeHtml(user.realName || '-')],
-                ['邮箱', escapeHtml(user.email || '-') + verifiedBadge(user.emailVerified)],
-                ['手机号', escapeHtml(user.phone || '-') + verifiedBadge(user.phoneVerified)],
+                ['邮箱', escapeHtml(user.email || '-') + verifiedBadge(user.email)],
+                ['手机号', escapeHtml(user.phone || '-') + verifiedBadge(user.phone)],
                 ['昵称', escapeHtml(user.nickname || '-')],
                 ['头像', user.avatar ? `<img src="${escapeHtml(user.avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;vertical-align:middle">` : '-'],
                 ['性别', formatGender(user.gender)],
@@ -1103,10 +1106,10 @@
                  : '<span class="badge badge-danger">未验证</span>';
     }
 
-    /** 邮箱/手机验证状态徽章（已验证绿/未验证红） */
-    function verifiedBadge(v) {
-        return v ? ' <span class="badge badge-success">已验证</span>'
-                 : ' <span class="badge badge-danger">未验证</span>';
+    /** 邮箱/手机绑定状态徽章：有值即已验证（绿），无值即未绑定（黄） */
+    function verifiedBadge(value) {
+        return value ? ' <span class="badge badge-success">已验证</span>'
+                     : ' <span class="badge badge-warning">未绑定</span>';
     }
 
     function escapeHtml(text) {
@@ -1396,20 +1399,30 @@
     const OAUTH_PROVIDER_NAMES = { gitee: 'Gitee', github: 'GitHub' };
 
     async function loadBindings() {
+        let contacts = [];
         try {
-            // 平台列表动态获取：按当前租户已启用的 oauth 方式渲染（增删平台只需改后端枚举）
+            // 平台列表动态获取：按当前租户已启用的 oauth 方式渲染（增删平台只需改后端枚举）；
+            // 邮箱/手机行同样按启用前缀渲染，绑定值取自 /auth/me 实时数据
             const tenantUid = Auth.getCurrentUser()?.tenantUid;
-            const [bindings, methods] = await Promise.all([
+            const [bindings, methods, me] = await Promise.all([
                 API.LoginMethods.listMyBindings(),
-                API.LoginMethods.getEnabled(tenantUid)
+                API.LoginMethods.getEnabled(tenantUid),
+                API.Auth.getCurrentUser()
             ]);
+            Auth.updateUserInfo(me); // 刷新 auth_user 缓存，避免旧 email/phone
             const providers = (methods || [])
                 .filter(m => m.startsWith('oauth:'))
                 .map(m => m.substring('oauth:'.length))
                 .map(key => ({ key, name: OAUTH_PROVIDER_NAMES[key] || (key.charAt(0).toUpperCase() + key.slice(1)) }));
-            renderBindings(bindings || [], providers);
+            const emailMethod = (methods || []).find(m => m.startsWith('email:'));
+            const phoneMethod = (methods || []).find(m => m.startsWith('sms:'));
+            if (emailMethod) contacts.push({ type: 'email', method: emailMethod, name: '邮箱', value: me.email || null });
+            if (phoneMethod) contacts.push({ type: 'phone', method: phoneMethod, name: '手机号', value: me.phone || null });
+            lastContacts = contacts;
+            renderBindings(bindings || [], providers, contacts);
         } catch (error) {
             Toast.error('加载绑定列表失败: ' + error.message);
+            renderBindings([], [], []);
         }
         // 绑定回调结果（init 早期捕获，因为 switchPageView 会把 hash 规范化成 #bindings 丢掉 &bind=）
         if (pendingBindResult) {
@@ -1419,15 +1432,34 @@
         }
     }
 
-    function renderBindings(bindings, providers) {
+    function renderBindings(bindings, providers, contacts) {
         const tbody = document.getElementById('bindingsTableBody');
-        if (!providers || !providers.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">当前租户未启用任何第三方登录方式</td></tr>';
+        if ((!providers || !providers.length) && (!contacts || !contacts.length)) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">当前租户未启用任何可绑定的登录方式</td></tr>';
             return;
         }
+        // 邮箱/手机行在前，第三方行在后
+        const contactRows = (contacts || []).map(c => {
+            const bound = !!c.value;
+            const status = bound
+                ? '<span class="badge badge-success">已绑定</span>'
+                : '<span class="badge badge-warning">未绑定</span>';
+            const action = bound
+                ? `<button class="btn btn-sm btn-outline" onclick='App.openBindContactModal(${quoteJsString(c.type)})'>换绑</button>
+                   <button class="btn btn-sm btn-danger" onclick='App.unbindContact(${quoteJsString(c.type)})'>解绑</button>`
+                : `<button class="btn btn-sm btn-primary" onclick='App.openBindContactModal(${quoteJsString(c.type)})'>绑定</button>`;
+            return `
+                <tr>
+                    <td>${escapeHtml(c.name)}</td>
+                    <td>${bound ? escapeHtml(c.value) : '-'}</td>
+                    <td>${status}</td>
+                    <td><div class="action-buttons">${action}</div></td>
+                </tr>
+            `;
+        }).join('');
         const boundMap = {};
         bindings.forEach(b => { boundMap[b.provider] = b; });
-        tbody.innerHTML = providers.map(p => {
+        const providerRows = (providers || []).map(p => {
             const bound = boundMap[p.key];
             const status = bound
                 ? '<span class="badge badge-success">已绑定</span>'
@@ -1444,6 +1476,7 @@
                 </tr>
             `;
         }).join('');
+        tbody.innerHTML = contactRows + providerRows;
     }
 
     async function bindProvider(provider) {
@@ -1467,6 +1500,126 @@
         }
     }
 
+    // ========== Bindings：邮箱/手机号（验证码绑定） ==========
+    let bindContactState = null; // {type: 'email'|'phone', method, bound}
+    let lastContacts = [];
+
+    function setupBindContactModal() {
+        document.getElementById('bindContactSendBtn').addEventListener('click', sendContactCode);
+        document.getElementById('bindContactSubmitBtn').addEventListener('click', submitBindContact);
+    }
+
+    /** 打开绑定/换绑弹窗（type: email|phone） */
+    function openBindContactModal(type) {
+        const contact = lastContacts.find(c => c.type === type);
+        if (!contact) return;
+        bindContactState = { type, method: contact.method, bound: !!contact.value };
+        const isEmail = type === 'email';
+        document.getElementById('bindContactModalTitle').textContent =
+            (bindContactState.bound ? '换绑' : '绑定') + (isEmail ? '邮箱' : '手机号');
+        document.getElementById('bindContactTargetLabel').textContent = isEmail ? '邮箱地址' : '手机号';
+        const targetInput = document.getElementById('bindContactTarget');
+        targetInput.type = isEmail ? 'email' : 'tel';
+        targetInput.placeholder = isEmail ? '请输入邮箱地址' : '请输入 11 位手机号';
+        targetInput.value = '';
+        document.getElementById('bindContactCode').value = '';
+        // 重置发送按钮（上一次倒计时可能未结束）
+        const sendBtn = document.getElementById('bindContactSendBtn');
+        sendBtn.disabled = false;
+        sendBtn.textContent = '获取验证码';
+        openModal('bindContactModal');
+    }
+
+    /** 发送验证码（复用公开 send-code 接口，60s 倒计时 + 后端限流兜底） */
+    async function sendContactCode() {
+        if (!bindContactState) return;
+        const target = document.getElementById('bindContactTarget').value.trim();
+        const isEmail = bindContactState.type === 'email';
+        if (!target) {
+            Toast.error(isEmail ? '请输入邮箱地址' : '请输入手机号');
+            return;
+        }
+        if (isEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) {
+            Toast.error('邮箱格式不正确');
+            return;
+        }
+        if (!isEmail && !/^1[3-9]\d{9}$/.test(target)) {
+            Toast.error('手机号格式不正确');
+            return;
+        }
+        const btn = document.getElementById('bindContactSendBtn');
+        try {
+            btn.disabled = true;
+            const tenantUid = Auth.getCurrentUser()?.tenantUid;
+            await API.Auth.sendCode(tenantUid, bindContactState.method, target);
+            Toast.success('验证码已发送');
+            codeCountdown(btn, 60);
+        } catch (error) {
+            Toast.error(error.message || '验证码发送失败');
+            btn.disabled = false;
+        }
+    }
+
+    /** 发送按钮 60s 倒计时（与登录页一致） */
+    function codeCountdown(btn, seconds) {
+        let remain = seconds;
+        btn.textContent = remain + 's 后重发';
+        const timer = setInterval(() => {
+            remain--;
+            if (remain <= 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.textContent = '获取验证码';
+            } else {
+                btn.textContent = remain + 's 后重发';
+            }
+        }, 1000);
+    }
+
+    /** 提交绑定/换绑 */
+    async function submitBindContact() {
+        if (!bindContactState) return;
+        const target = document.getElementById('bindContactTarget').value.trim();
+        const code = document.getElementById('bindContactCode').value.trim();
+        if (!target || !code) {
+            Toast.error('请输入目标与验证码');
+            return;
+        }
+        const btn = document.getElementById('bindContactSubmitBtn');
+        const originalText = btn.textContent;
+        try {
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+            if (bindContactState.type === 'email') {
+                await API.LoginMethods.bindEmail(bindContactState.method, target, code);
+            } else {
+                await API.LoginMethods.bindPhone(bindContactState.method, target, code);
+            }
+            Toast.success(bindContactState.bound ? '换绑成功' : '绑定成功');
+            closeModal('bindContactModal');
+            await loadBindings();
+        } catch (error) {
+            Toast.error(error.message || '绑定失败');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+
+    /** 解绑邮箱/手机号 */
+    async function unbindContact(type) {
+        const label = type === 'email' ? '邮箱' : '手机号';
+        if (!confirm('确定解绑' + label + '？解绑后将无法使用该' + label + '的验证码登录本账号。')) return;
+        try {
+            if (type === 'email') await API.LoginMethods.unbindEmail();
+            else await API.LoginMethods.unbindPhone();
+            Toast.success('解绑成功');
+            await loadBindings();
+        } catch (error) {
+            Toast.error('解绑失败: ' + error.message);
+        }
+    }
+
     // ========== Public API ==========
     window.App = {
         editUser,
@@ -1482,7 +1635,9 @@
         deleteTenant,
         editLoginMethod,
         bindProvider,
-        unbindBinding
+        unbindBinding,
+        openBindContactModal,
+        unbindContact
     };
 
     // Also expose Toast globally

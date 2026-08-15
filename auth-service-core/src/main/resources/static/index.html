@@ -295,8 +295,8 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>平台</th>
-                                    <th>第三方账号 ID</th>
+                                    <th>绑定方式</th>
+                                    <th>绑定标识</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -306,13 +306,40 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="form-text" style="padding:12px 0;">绑定后，可用对应第三方账号登录本系统账号。每种平台一个第三方账号只能绑定一个本地用户。</div>
+                    <div class="form-text" style="padding:12px 0;">绑定邮箱/手机号后可用验证码登录；绑定第三方账号后可用对应账号一键登录。同一邮箱/手机号/第三方账号在一个租户内只能绑定一个用户。</div>
                 </section>
             </div>
         </main>
     </div>
 
     <!-- Modals -->
+    <!-- Bind Contact Modal（绑定/换绑邮箱、手机号） -->
+    <div class="modal" id="bindContactModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bindContactModalTitle">绑定邮箱</h3>
+                <button class="modal-close" data-close="bindContactModal">&times;</button>
+            </div>
+            <form class="modal-body" id="bindContactForm" onsubmit="return false;">
+                <div class="form-group">
+                    <label id="bindContactTargetLabel">邮箱地址</label>
+                    <input type="email" class="form-control" id="bindContactTarget" placeholder="请输入邮箱地址">
+                </div>
+                <div class="form-group">
+                    <label for="bindContactCode">验证码</label>
+                    <div class="code-row">
+                        <input type="text" class="form-control" id="bindContactCode" placeholder="6 位验证码" maxlength="6" inputmode="numeric">
+                        <button type="button" class="btn-code" id="bindContactSendBtn">获取验证码</button>
+                    </div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="bindContactModal">取消</button>
+                <button class="btn btn-primary" id="bindContactSubmitBtn">确认绑定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- User Modal -->
     <div class="modal" id="userModal">
         <div class="modal-content">
@@ -345,6 +372,7 @@
                 <div class="form-group">
                     <label>邮箱</label>
                     <input type="email" class="form-control" id="userEmail">
+                    <small class="form-text">填写即视为已验证，清空即解绑</small>
                 </div>
                 <div class="form-group">
                     <label>昵称</label>
@@ -353,6 +381,7 @@
                 <div class="form-group">
                     <label>手机号</label>
                     <input type="tel" class="form-control" id="userPhone" placeholder="11位手机号">
+                    <small class="form-text">填写即视为已验证，清空即解绑</small>
                 </div>
                 <div class="form-group">
                     <label>真实姓名</label>

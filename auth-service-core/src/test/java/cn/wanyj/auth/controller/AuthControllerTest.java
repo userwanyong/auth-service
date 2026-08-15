@@ -7,6 +7,8 @@ import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.exception.GlobalExceptionHandler;
 import cn.wanyj.auth.service.AuthService;
+import cn.wanyj.auth.service.ContactBindingService;
+import cn.wanyj.auth.service.oauth.OAuthLoginService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,10 +36,16 @@ class AuthControllerTest {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private OAuthLoginService oAuthLoginService;
+
+    @Mock
+    private ContactBindingService contactBindingService;
+
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService, oAuthLoginService, contactBindingService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -56,7 +64,7 @@ class AuthControllerTest {
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("password");
-        request.setTenantId(100L);
+        request.setTenantUid("test-tenant-uid");
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -97,7 +105,7 @@ class AuthControllerTest {
         LoginRequest request = new LoginRequest();
         request.setUsername("testuser");
         request.setPassword("password");
-        request.setTenantId(100L);
+        request.setTenantUid("test-tenant-uid");
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

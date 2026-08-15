@@ -92,6 +92,16 @@
           AND tenant_id = #{tenantId}
     </select>
 
+    <!-- Find By Phone And TenantId -->
+    <select id="findByPhone" resultMap="UserResultMap">
+        SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
+               status, email_verified, last_login_at, created_at, updated_at,
+               real_name, gender, birthday, phone_verified
+        FROM user
+        WHERE phone = #{phone}
+          AND tenant_id = #{tenantId}
+    </select>
+
     <!-- Find By Username Or Email And TenantId -->
     <select id="findByUsernameOrEmail" resultMap="UserResultMap">
         SELECT id, tenant_id, username, password, email, phone, nickname, avatar,
