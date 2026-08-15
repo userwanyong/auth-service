@@ -98,7 +98,8 @@ public class LoginMethodConfigServiceImpl implements LoginMethodConfigService {
                     .category(dm.getCategory())
                     .displayName(dm.getDisplayName())
                     .enabled(enabled)
-                    .hasConfig(hasCipher(row))
+                    // password 内置于系统、无需外部凭证，视为已配置
+                    .hasConfig(isPassword || hasCipher(row))
                     .platformLocked(isPassword)
                     .build());
         }
@@ -146,7 +147,8 @@ public class LoginMethodConfigServiceImpl implements LoginMethodConfigService {
                     .displayName(dm.getDisplayName())
                     .enabled(tenantEnabled)
                     .usePlatformConfig(usePlatform)
-                    .hasConfig(effectiveHasConfig)
+                    // password 内置于系统、无需外部凭证，视为已配置
+                    .hasConfig(isPassword || effectiveHasConfig)
                     .platformEnabled(true)
                     .build());
         }

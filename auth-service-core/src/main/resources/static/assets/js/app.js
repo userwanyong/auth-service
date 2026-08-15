@@ -1393,16 +1393,21 @@
             pendingBindResult = { result: params.get('bind'), msg: params.get('msg') };
         }
     }
-    const OAUTH_PROVIDERS = [
-        { key: 'gitee', name: 'Gitee' },
-        { key: 'microsoft', name: 'Microsoft' },
-        { key: 'github', name: 'GitHub' }
-    ];
+    const OAUTH_PROVIDER_NAMES = { gitee: 'Gitee', github: 'GitHub' };
 
     async function loadBindings() {
         try {
-            const bindings = await API.LoginMethods.listMyBindings();
-            renderBindings(bindings || []);
+            // 平台列表动态获取：按当前租户已启用的 oauth 方式渲染（增删平台只需改后端枚举）
+            const tenantUid = Auth.getCurrentUser()?.tenantUid;
+            const [bindings, methods] = await Promise.all([
+                API.LoginMethods.listMyBindings(),
+                API.LoginMethods.getEnabled(tenantUid)
+            ]);
+            const providers = (methods || [])
+                .filter(m => m.startsWith('oauth:'))
+                .map(m => m.substring('oauth:'.length))
+                .map(key => ({ key, name: OAUTH_PROVIDER_NAMES[key] || (key.charAt(0).toUpperCase() + key.slice(1)) }));
+            renderBindings(bindings || [], providers);
         } catch (error) {
             Toast.error('加载绑定列表失败: ' + error.message);
         }
@@ -1414,11 +1419,15 @@
         }
     }
 
-    function renderBindings(bindings) {
+    function renderBindings(bindings, providers) {
         const tbody = document.getElementById('bindingsTableBody');
+        if (!providers || !providers.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">当前租户未启用任何第三方登录方式</td></tr>';
+            return;
+        }
         const boundMap = {};
         bindings.forEach(b => { boundMap[b.provider] = b; });
-        tbody.innerHTML = OAUTH_PROVIDERS.map(p => {
+        tbody.innerHTML = providers.map(p => {
             const bound = boundMap[p.key];
             const status = bound
                 ? '<span class="badge badge-success">已绑定</span>'
