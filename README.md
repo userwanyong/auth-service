@@ -534,7 +534,7 @@ Triple 协议（HTTP/2）+ Protobuf 序列化，IDL 定义见 [`auth-service-api
 <dependency>
     <groupId>cn.wanyj.auth</groupId>
     <artifactId>auth-service-api</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
 </dependency>
 ```
 

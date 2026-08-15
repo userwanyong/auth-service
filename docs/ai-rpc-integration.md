@@ -81,7 +81,7 @@ mvn install -pl auth-service-api -am -DskipTests
 <dependency>
     <groupId>cn.wanyj.auth</groupId>
     <artifactId>auth-service-api</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
 </dependency>
 ```
 
@@ -806,7 +806,7 @@ OperationResult r = userRpc.assignRoles(ab.build());
 | 写操作报「用户名已存在」但你是首次调用 | retries>0 导致重试重复执行 | 写操作 `retries = 0`（规则 8） |
 | `sendCode` 报「该登录方式未启用」 | 租户未启用该方式或平台未开启 | 走 HTTP 管理端或 `LoginMethodRpcService` 开启并配置凭证 |
 | `updateUser` 改 `status`/清空字段不生效 | 字段没进 `fields_to_update` 掩码 | 规则 6 |
-| 序列化异常 / 类型不匹配 | API jar 版本与服务端 proto 不一致 | 使用与服务端同版本的 `auth-service-api`（当前 1.0） |
+| 序列化异常 / 类型不匹配 | API jar 版本与服务端 proto 不一致 | 使用与服务端同版本的 `auth-service-api`（当前 1.1） |
 
 ## 10. 集成自检清单
 

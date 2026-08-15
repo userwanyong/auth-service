@@ -6,7 +6,7 @@
     <parent>
         <groupId>cn.wanyj.auth</groupId>
         <artifactId>auth-service-parent</artifactId>
-        <version>1.0</version>
+        <version>1.1</version>
     </parent>
 
     <artifactId>auth-service-api</artifactId>
