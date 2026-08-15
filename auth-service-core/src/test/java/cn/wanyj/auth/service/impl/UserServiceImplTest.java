@@ -9,6 +9,7 @@ import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.RoleMapper;
 import cn.wanyj.auth.mapper.UserMapper;
 import cn.wanyj.auth.mapper.UserRoleMapper;
+import cn.wanyj.auth.service.OssService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,12 +36,13 @@ class UserServiceImplTest {
     @Mock private RoleMapper roleMapper;
     @Mock private UserRoleMapper userRoleMapper;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private OssService ossService;
 
     private UserServiceImpl userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userMapper, roleMapper, userRoleMapper, passwordEncoder);
+        userService = new UserServiceImpl(userMapper, roleMapper, userRoleMapper, passwordEncoder, ossService);
     }
 
     // ===== 越权防护：跨租户操作必须被拒（返回 NOT_FOUND，不泄露存在性） =====
@@ -160,6 +162,69 @@ class UserServiceImplTest {
         assertEquals("original", saved.getUsername());       // 未提供 → 不改
         assertEquals("original-pwd", saved.getPassword());   // 未提供 → 不改
         assertEquals("orig@example.com", saved.getEmail());  // 未提供 → 不改（null=不改，非清空）
+    }
+
+    // ===== 联系方式绑定语义：填写即已验证，清空即未绑定 =====
+
+    @Test
+    void updateUser_shouldMarkVerifiedWhenContactProvided() {
+        User existing = userInTenant(1L, 100L);
+        when(userMapper.findById(1L)).thenReturn(existing);
+        when(userMapper.existsByEmail("a@b.com", 100L)).thenReturn(false);
+        when(userMapper.existsByPhone("13800138000", 100L)).thenReturn(false);
+
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setEmail("a@b.com");
+        req.setPhone("13800138000");
+
+        userService.updateUser(1L, 100L, req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).update(captor.capture());
+        User saved = captor.getValue();
+        assertEquals("a@b.com", saved.getEmail());
+        assertEquals(Boolean.TRUE, saved.getEmailVerified());
+        assertEquals("13800138000", saved.getPhone());
+        assertEquals(Boolean.TRUE, saved.getPhoneVerified());
+    }
+
+    @Test
+    void updateUser_shouldResetVerifiedWhenContactCleared() {
+        User existing = userInTenant(1L, 100L);
+        existing.setEmail("a@b.com");
+        existing.setEmailVerified(true);
+        existing.setPhone("13800138000");
+        existing.setPhoneVerified(true);
+        when(userMapper.findById(1L)).thenReturn(existing);
+
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setEmail("");
+        req.setPhone("");
+
+        userService.updateUser(1L, 100L, req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).update(captor.capture());
+        User saved = captor.getValue();
+        assertNull(saved.getEmail());
+        assertEquals(Boolean.FALSE, saved.getEmailVerified());
+        assertNull(saved.getPhone());
+        assertEquals(Boolean.FALSE, saved.getPhoneVerified());
+    }
+
+    @Test
+    void updateUser_shouldRejectPhoneOwnedByOtherInTenant() {
+        User existing = userInTenant(1L, 100L);
+        when(userMapper.findById(1L)).thenReturn(existing);
+        when(userMapper.existsByPhone("13800138000", 100L)).thenReturn(true);
+
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setPhone("13800138000");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.updateUser(1L, 100L, req));
+        assertEquals(ErrorCode.PHONE_EXISTS.getCode(), ex.getCode());
+        verify(userMapper, never()).update(any());
     }
 
     // ===== helpers =====

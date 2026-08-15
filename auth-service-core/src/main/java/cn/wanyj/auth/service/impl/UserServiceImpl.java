@@ -197,7 +197,8 @@ public class UserServiceImpl implements UserService {
             user.setUsername(username);
         }
 
-        // email: null=不改，空串=清空，非空=更新（含租户内唯一性校验）
+        // email: null=不改（RPC 掩码），空串=清空（未绑定），非空=更新（含租户内唯一性校验）
+        // 管理端编辑直接视为绑定成功：填写即已验证，清空即重置验证标记
         if (request.getEmail() != null) {
             String email = request.getEmail().trim();
             email = email.isEmpty() ? null : email;
@@ -205,11 +206,17 @@ public class UserServiceImpl implements UserService {
                 throw new BusinessException(ErrorCode.EMAIL_EXISTS);
             }
             user.setEmail(email);
+            user.setEmailVerified(email != null);
         }
 
         if (request.getPhone() != null) {
             String phone = request.getPhone().trim();
-            user.setPhone(phone.isEmpty() ? null : phone);
+            phone = phone.isEmpty() ? null : phone;
+            if (phone != null && !phone.equals(user.getPhone()) && tenantId != null && userMapper.existsByPhone(phone, tenantId)) {
+                throw new BusinessException(ErrorCode.PHONE_EXISTS);
+            }
+            user.setPhone(phone);
+            user.setPhoneVerified(phone != null);
         }
 
         // nickname: null=不改，空串=清空，非空=更新
