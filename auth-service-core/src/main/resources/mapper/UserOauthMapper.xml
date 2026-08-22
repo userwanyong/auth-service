@@ -43,4 +43,8 @@
         WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND provider = #{provider}
     </delete>
 
+    <delete id="deleteByUserId">
+        DELETE FROM user_oauth WHERE user_id = #{userId}
+    </delete>
+
 </mapper>

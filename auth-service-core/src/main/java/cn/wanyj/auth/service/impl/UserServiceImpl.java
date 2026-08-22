@@ -13,6 +13,7 @@ import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.RoleMapper;
 import cn.wanyj.auth.mapper.UserMapper;
+import cn.wanyj.auth.mapper.UserOauthMapper;
 import cn.wanyj.auth.mapper.UserRoleMapper;
 import cn.wanyj.auth.service.OssService;
 import cn.wanyj.auth.service.UserService;
@@ -41,6 +42,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
+    private final UserOauthMapper userOauthMapper;
     private final PasswordEncoder passwordEncoder;
     private final OssService ossService;
 
@@ -287,8 +289,10 @@ public class UserServiceImpl implements UserService {
         // 因此按 DB 中实际存储的头像 URL 删除，而不是按用户前缀猜测
         String avatarUrl = user.getAvatar();
 
-        // Delete user roles first
+        // Delete user roles and OAuth bindings first（不清理绑定会留下孤儿记录，
+        // 导致该第三方账号再次 OAuth 登录时匹配到已删除用户，报"用户不存在"）
         userMapper.deleteUserRolesByUserId(userId);
+        userOauthMapper.deleteByUserId(userId);
 
         // Delete user
         userMapper.deleteById(userId);

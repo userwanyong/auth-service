@@ -8,6 +8,7 @@ import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.mapper.RoleMapper;
 import cn.wanyj.auth.mapper.UserMapper;
+import cn.wanyj.auth.mapper.UserOauthMapper;
 import cn.wanyj.auth.mapper.UserRoleMapper;
 import cn.wanyj.auth.service.OssService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class UserServiceImplTest {
     @Mock private UserMapper userMapper;
     @Mock private RoleMapper roleMapper;
     @Mock private UserRoleMapper userRoleMapper;
+    @Mock private UserOauthMapper userOauthMapper;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private OssService ossService;
 
@@ -42,7 +44,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userMapper, roleMapper, userRoleMapper, passwordEncoder, ossService);
+        userService = new UserServiceImpl(userMapper, roleMapper, userRoleMapper, userOauthMapper, passwordEncoder, ossService);
     }
 
     // ===== 越权防护：跨租户操作必须被拒（返回 NOT_FOUND，不泄露存在性） =====
@@ -100,6 +102,18 @@ class UserServiceImplTest {
                 () -> userService.deleteUser(1L, 200L));
         assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), ex.getCode());
         verify(userMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteUser_shouldCascadeCleanOauthBindings() {
+        when(userMapper.findById(1L)).thenReturn(userInTenant(1L, 100L));
+
+        userService.deleteUser(1L, 100L);
+
+        // 级联清理顺序：先删子表（角色、OAuth 绑定），再删用户
+        verify(userMapper).deleteUserRolesByUserId(1L);
+        verify(userOauthMapper).deleteByUserId(1L);
+        verify(userMapper).deleteById(1L);
     }
 
     // ===== 同租户正常流程 =====

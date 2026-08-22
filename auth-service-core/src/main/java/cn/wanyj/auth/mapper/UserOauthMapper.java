@@ -42,4 +42,9 @@ public interface UserOauthMapper {
     int deleteByTenantUserProvider(@Param("tenantId") Long tenantId,
                                   @Param("userId") Long userId,
                                   @Param("provider") String provider);
+
+    /**
+     * 删除用户时级联清理其全部 OAuth 绑定（防止孤儿绑定指向已删除用户）
+     */
+    int deleteByUserId(@Param("userId") Long userId);
 }
