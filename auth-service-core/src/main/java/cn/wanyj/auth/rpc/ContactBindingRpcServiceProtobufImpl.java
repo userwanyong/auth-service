@@ -3,6 +3,7 @@ package cn.wanyj.auth.rpc;
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.BindContactRequest;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.ContactBindingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +27,15 @@ import org.apache.dubbo.config.annotation.DubboService;
 public class ContactBindingRpcServiceProtobufImpl extends DubboContactBindingRpcServiceProtobufTriple.ContactBindingRpcServiceProtobufImplBase {
 
     private final ContactBindingService contactBindingService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public OperationResult bindEmail(BindContactRpcRequest request) {
-        log.info("RPC bindEmail: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC bindEmail: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             contactBindingService.bindEmail(
                 Long.parseLong(request.getUserId()),
-                Long.parseLong(request.getTenantId()),
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId(),
                 toBindRequest(request));
 
             return OperationResult.newBuilder()
@@ -57,11 +59,11 @@ public class ContactBindingRpcServiceProtobufImpl extends DubboContactBindingRpc
 
     @Override
     public OperationResult unbindEmail(ContactUnbindRpcRequest request) {
-        log.info("RPC unbindEmail: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC unbindEmail: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             contactBindingService.unbindEmail(
                 Long.parseLong(request.getUserId()),
-                Long.parseLong(request.getTenantId()));
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId());
 
             return OperationResult.newBuilder()
                 .setSuccess(true)
@@ -84,11 +86,11 @@ public class ContactBindingRpcServiceProtobufImpl extends DubboContactBindingRpc
 
     @Override
     public OperationResult bindPhone(BindContactRpcRequest request) {
-        log.info("RPC bindPhone: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC bindPhone: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             contactBindingService.bindPhone(
                 Long.parseLong(request.getUserId()),
-                Long.parseLong(request.getTenantId()),
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId(),
                 toBindRequest(request));
 
             return OperationResult.newBuilder()
@@ -112,11 +114,11 @@ public class ContactBindingRpcServiceProtobufImpl extends DubboContactBindingRpc
 
     @Override
     public OperationResult unbindPhone(ContactUnbindRpcRequest request) {
-        log.info("RPC unbindPhone: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC unbindPhone: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             contactBindingService.unbindPhone(
                 Long.parseLong(request.getUserId()),
-                Long.parseLong(request.getTenantId()));
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId());
 
             return OperationResult.newBuilder()
                 .setSuccess(true)

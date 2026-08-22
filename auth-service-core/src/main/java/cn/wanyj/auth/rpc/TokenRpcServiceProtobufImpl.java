@@ -5,8 +5,11 @@ import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.ValidatedToken;
 import cn.wanyj.auth.entity.Permission;
 import cn.wanyj.auth.entity.Role;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.entity.User;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
+import cn.wanyj.auth.service.TenantService;
 import cn.wanyj.auth.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,17 +35,20 @@ import java.util.stream.Collectors;
 public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTriple.TokenRpcServiceProtobufImplBase {
 
     private final TokenService tokenService;
+    private final TenantService tenantService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public TokenRpcResponse generateToken(TokenGenerationRequest request) {
-        log.info("RPC generate token: userId={}, expiration={}, tenantId={}",
-            request.getUserId(), request.getExpiration(), request.getTenantId());
+        log.info("RPC generate token: userId={}, expiration={}, tenantUid={}",
+            request.getUserId(), request.getExpiration(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
 
-            // tenantId > 0 时强制租户隔离；=0 保持"不指定租户"语义（Service 层处理）
-            TokenResponse tokenResponse = tokenService.issueTokens(userId, tenantId, request.getExpiration());
+            // tenantUid 留空保持"不指定租户"语义；非空时强制租户隔离（Service 层处理）
+            TokenResponse tokenResponse = tokenService.issueTokens(
+                userId, tenant != null ? tenant.getId() : null, request.getExpiration());
 
             return TokenRpcResponse.newBuilder()
                 .setAccessToken(tokenResponse.getAccessToken())
@@ -71,12 +77,14 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
             }
 
             User user = validated.getUser();
+            // 数字 tenantId 仅内部使用，对外回填 tenantUid（租户已删除则留空）
+            Tenant tenant = tenantService.getTenantById(user.getTenantId());
 
             return TokenValidationResult.newBuilder()
                 .setValid(true)
                 .setUserId(user.getId())
                 .setUsername(user.getUsername())
-                .setTenantId(user.getTenantId())
+                .setTenantUid(tenant != null && tenant.getTenantUid() != null ? tenant.getTenantUid() : "")
                 .addAllRoles(user.getRoles().stream()
                     .map(Role::getCode)
                     .collect(Collectors.toList()))
@@ -98,11 +106,11 @@ public class TokenRpcServiceProtobufImpl extends DubboTokenRpcServiceProtobufTri
     @Override
     public Empty revokeAllTokens(RevokeAllTokensRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        log.info("RPC revoke all tokens: userId={}, tenantId={}", userId, request.getTenantId());
+        log.info("RPC revoke all tokens: userId={}, tenantUid={}", userId, request.getTenantUid());
         try {
-            // tenantId 为空（旧客户端）时跳过归属校验，由 Service 层处理
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
-            tokenService.revokeAllTokensForUser(userId, tenantId);
+            // tenantUid 留空时跳过归属校验，由 Service 层处理
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
+            tokenService.revokeAllTokensForUser(userId, tenant != null ? tenant.getId() : null);
             log.info("All tokens revoked for user={}", userId);
         } catch (BusinessException e) {
             log.warn("Revoke tokens failed: {}", e.getMessage());

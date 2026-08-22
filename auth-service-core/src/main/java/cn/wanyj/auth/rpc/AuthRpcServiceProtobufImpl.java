@@ -11,10 +11,9 @@ import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.dto.response.UserResponse;
 import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.exception.BusinessException;
-import cn.wanyj.auth.exception.ErrorCode;
 import cn.wanyj.auth.rpc.converter.UserProtobufConverter;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.AuthService;
-import cn.wanyj.auth.service.TenantService;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,17 +41,19 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     private final AuthService authService;
     private final UserService userService;
-    private final TenantService tenantService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public RegisterRpcResult register(RegisterRpcRequest request) {
-        log.info("RPC register: username={}, tenantId={}", request.getUsername(), request.getTenantId());
+        log.info("RPC register: username={}, tenantUid={}", request.getUsername(), request.getTenantUid());
         try {
+            // 对外只认 tenantUid，内部转数字 tenantId 使用
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             TokenResponse tokenResponse = authService.register(
                 RegisterRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
-                    .tenantId(Long.parseLong(request.getTenantId()))
+                    .tenantId(tenantId)
                     .email(emptyToNull(request.getEmail()))
                     .phone(emptyToNull(request.getPhone()))
                     .nickname(emptyToNull(request.getNickname()))
@@ -89,18 +90,13 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public AuthResult authenticate(LoginRpcRequest request) {
-        log.info("RPC authenticate: username={}, tenantId={}", request.getUsername(), request.getTenantId());
+        log.info("RPC authenticate: username={}, tenantUid={}", request.getUsername(), request.getTenantUid());
         try {
-            // RPC 内部按数字 tenantId 定位租户，转对外 uid 走统一登录入口
-            Tenant tenant = tenantService.getTenantById(Long.parseLong(request.getTenantId()));
-            if (tenant == null || tenant.getTenantUid() == null) {
-                throw new BusinessException(ErrorCode.INVALID_TENANT);
-            }
             TokenResponse tokenResponse = authService.login(
                 LoginRequest.builder()
                     .username(request.getUsername())
                     .password(request.getPassword())
-                    .tenantUid(tenant.getTenantUid())
+                    .tenantUid(request.getTenantUid())
                     .build()
             );
 
@@ -127,59 +123,59 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public UserRpcResponse getUserById(UserByIdRequest request) {
-        log.info("RPC getUserById: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC getUserById: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Tenant tenant = tenantUidResolver.requireTenant(request.getTenantUid());
 
-            UserResponse user = userService.getUserById(userId, tenantId);
+            UserResponse user = userService.getUserById(userId, tenant.getId());
             // 禁用用户对 RPC 调用方不可见（与改造前行为一致）
             if (user.getStatus() != null && user.getStatus() == 0) {
-                log.warn("User disabled: userId={}, tenantId={}", userId, tenantId);
+                log.warn("User disabled: userId={}, tenantId={}", userId, tenant.getId());
                 return UserRpcResponse.getDefaultInstance();
             }
-            return UserProtobufConverter.convertToProtobuf(user);
+            return UserProtobufConverter.convertToProtobuf(user, tenant.getTenantUid());
         } catch (BusinessException e) {
             log.warn("getUserById failed: {}", e.getMessage());
             return UserRpcResponse.getDefaultInstance();
         } catch (Exception e) {
-            log.error("Failed to get user by id: userId={}, tenantId={}",
-                request.getUserId(), request.getTenantId(), e);
+            log.error("Failed to get user by id: userId={}, tenantUid={}",
+                request.getUserId(), request.getTenantUid(), e);
             return UserRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
     public UserRpcResponse getUserByUsername(UserByUsernameRequest request) {
-        log.info("RPC getUserByUsername: username={}, tenantId={}",
-            request.getUsername(), request.getTenantId());
+        log.info("RPC getUserByUsername: username={}, tenantUid={}",
+            request.getUsername(), request.getTenantUid());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Tenant tenant = tenantUidResolver.requireTenant(request.getTenantUid());
 
-            UserResponse user = userService.getUserByUsername(request.getUsername(), tenantId);
+            UserResponse user = userService.getUserByUsername(request.getUsername(), tenant.getId());
             // 禁用用户对 RPC 调用方不可见（与改造前行为一致）
             if (user.getStatus() != null && user.getStatus() == 0) {
-                log.warn("User disabled: username={}, tenantId={}", request.getUsername(), tenantId);
+                log.warn("User disabled: username={}, tenantId={}", request.getUsername(), tenant.getId());
                 return UserRpcResponse.getDefaultInstance();
             }
-            return UserProtobufConverter.convertToProtobuf(user);
+            return UserProtobufConverter.convertToProtobuf(user, tenant.getTenantUid());
         } catch (BusinessException e) {
             log.warn("getUserByUsername failed: {}", e.getMessage());
             return UserRpcResponse.getDefaultInstance();
         } catch (Exception e) {
-            log.error("Failed to get user by username: username={}, tenantId={}",
-                request.getUsername(), request.getTenantId(), e);
+            log.error("Failed to get user by username: username={}, tenantUid={}",
+                request.getUsername(), request.getTenantUid(), e);
             return UserRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
     public BoolValue hasPermission(PermissionCheckRequest request) {
-        log.info("RPC hasPermission: userId={}, permission={}, tenantId={}",
-            request.getUserId(), request.getPermission(), request.getTenantId());
+        log.info("RPC hasPermission: userId={}, permission={}, tenantUid={}",
+            request.getUserId(), request.getPermission(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             // Service 内部已处理：用户不存在/跨租户/禁用 → false
             boolean has = userService.hasPermission(userId, tenantId, request.getPermission());
             return BoolValue.newBuilder().setValue(has).build();
@@ -191,11 +187,11 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public BoolValue hasRole(RoleCheckRequest request) {
-        log.info("RPC hasRole: userId={}, role={}, tenantId={}",
-            request.getUserId(), request.getRole(), request.getTenantId());
+        log.info("RPC hasRole: userId={}, role={}, tenantUid={}",
+            request.getUserId(), request.getRole(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             boolean has = userService.hasRole(userId, tenantId, request.getRole());
             return BoolValue.newBuilder().setValue(has).build();
         } catch (Exception e) {
@@ -206,10 +202,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public StringListResponse getUserPermissions(UserPermissionsRequest request) {
-        log.info("RPC getUserPermissions: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC getUserPermissions: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             // Service 对用户不存在/跨租户返回空列表
             List<String> permissions = userService.getUserPermissions(userId, tenantId);
             return StringListResponse.newBuilder().addAllValues(permissions).build();
@@ -221,10 +217,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public StringListResponse getUserRoles(UserRolesRequest request) {
-        log.info("RPC getUserRoles: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC getUserRoles: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             List<String> roles = userService.getUserRoles(userId, tenantId);
             return StringListResponse.newBuilder().addAllValues(roles).build();
         } catch (Exception e) {
@@ -239,12 +235,12 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
         int size = request.getSize() > 0 ? request.getSize() : 10;
         String keyword = emptyToNull(request.getKeyword());
 
-        log.info("RPC searchUsers: tenantId={}, page={}, size={}, keyword={}",
-            request.getTenantId(), page, size, keyword);
+        log.info("RPC searchUsers: tenantUid={}, page={}, size={}, keyword={}",
+            request.getTenantUid(), page, size, keyword);
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Tenant tenant = tenantUidResolver.requireTenant(request.getTenantUid());
 
-            PageResponse<UserResponse> pageResponse = userService.searchUsers(keyword, tenantId, page, size);
+            PageResponse<UserResponse> pageResponse = userService.searchUsers(keyword, tenant.getId(), page, size);
 
             UserPageResponse.Builder builder = UserPageResponse.newBuilder()
                 .setTotal(pageResponse.getTotal() != null ? pageResponse.getTotal() : 0L)
@@ -253,7 +249,7 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
             if (pageResponse.getItems() != null) {
                 builder.addAllItems(pageResponse.getItems().stream()
-                    .map(UserProtobufConverter::convertToProtobuf)
+                    .map(user -> UserProtobufConverter.convertToProtobuf(user, tenant.getTenantUid()))
                     .collect(Collectors.toList()));
             }
 
@@ -313,10 +309,10 @@ public class AuthRpcServiceProtobufImpl extends DubboAuthRpcServiceProtobufTripl
 
     @Override
     public OperationResult changePassword(ChangePasswordRpcRequest request) {
-        log.info("RPC changePassword: userId={}, tenantId={}", request.getUserId(), request.getTenantId());
+        log.info("RPC changePassword: userId={}, tenantUid={}", request.getUserId(), request.getTenantUid());
         try {
             Long userId = Long.parseLong(request.getUserId());
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
 
             ChangePasswordRequest changePasswordRequest = ChangePasswordRequest.builder()
                 .oldPassword(request.getOldPassword())

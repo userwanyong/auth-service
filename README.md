@@ -538,7 +538,7 @@ Triple 协议（HTTP/2）+ Protobuf 序列化，IDL 定义见 [`auth-service-api
 </dependency>
 ```
 
-> **注意**：请求消息中的 ID 字段（`userId`、`tenantId`、`roleId` 等）均用 `string` 类型，避免 JavaScript 等弱类型语言中雪花 ID 大整数精度丢失，调用时直接传字符串。
+> **注意**：请求消息中的 ID 字段（`userId`、`roleId` 等）均用 `string` 类型，避免 JavaScript 等弱类型语言中雪花 ID 大整数精度丢失，调用时直接传字符串；租户统一传 `tenantUid`（8 位随机串）。
 
 ### 服务总览（9 个）
 
@@ -648,14 +648,14 @@ Triple 协议（HTTP/2）+ Protobuf 序列化，IDL 定义见 [`auth-service-api
 
 ### 多租户归属校验
 
-为防止跨租户越权，所有「按 ID 操作资源」的 RPC 都需在请求中携带 `tenantId`，服务端校验资源归属：
+为防止跨租户越权，所有「按 ID 操作资源」的 RPC 都需在请求中携带 `tenantUid`（对外租户标识），服务端解析为内部租户后校验资源归属：
 
 - 用户：`getUserById` / `getUserByUsername` / `updateUser` / `updateUserStatus` / `assignRoles` / `deleteUser`
 - 角色：`getRoleById` / `updateRole` / `deleteRole` / `assignPermissions`
 - 权限：`getPermissionById` / `deletePermission`
 - 令牌：`revokeAllTokens`
 
-> `tenantId` 为空（旧客户端）时跳过校验；非空时强制校验，资源不属于该租户则视为不存在（返回空/失败，不抛 Forbidden，避免泄露存在性）。
+> 上述按 ID 操作的方法 `tenantUid` 允许留空：留空=跳过归属校验；非空时强制校验，资源不属于该租户则视为不存在（返回空/失败，不抛 Forbidden，避免泄露存在性）。其余方法的 `tenantUid` 必填且须为有效租户。
 
 ### updateUser 字段掩码
 
@@ -664,7 +664,7 @@ Triple 协议（HTTP/2）+ Protobuf 序列化，IDL 定义见 [`auth-service-api
 ```java
 UpdateUserRpcRequest.newBuilder()
     .setUserId("123456")
-    .setTenantId("1")
+    .setTenantUid("dm3a9x1f")
     .setNickname("新昵称")        // 设置新值
     .setStatus(0)                // 0 = 禁用（因出现在掩码中，不会被当作「未提供」）
     .addFieldsToUpdate("nickname")
@@ -682,7 +682,7 @@ private AuthRpcServiceProtobuf authRpcService;
 // 获取用户信息（多租户归属校验）
 UserByIdRequest request = UserByIdRequest.newBuilder()
     .setUserId(userId)
-    .setTenantId(tenantId)
+    .setTenantUid(tenantUid)
     .build();
 UserRpcResponse user = authRpcService.getUserById(request);
 
@@ -690,7 +690,7 @@ UserRpcResponse user = authRpcService.getUserById(request);
 PermissionCheckRequest permRequest = PermissionCheckRequest.newBuilder()
     .setUserId(userId)
     .setPermission("user:delete")
-    .setTenantId(tenantId)
+    .setTenantUid(tenantUid)
     .build();
 BoolValue result = authRpcService.hasPermission(permRequest);
 ```
@@ -801,8 +801,8 @@ curl -X POST http://localhost:8123/api/auth/me/email \
 
 | 标识 | 用途 | 使用场景 |
 |------|------|----------|
-| `tenantId`（数字） | 内部主键，JWT 中签发 | 注册请求、RPC 归属校验、服务端内部 |
-| `tenantUid`（8 位随机串） | 对外标识，防枚举自增 ID | 登录、发码、验证码登录、登录方式发现、租户管理路径 |
+| `tenantId`（数字） | 内部主键，JWT 中签发 | REST 注册请求、服务端内部（RPC 已不暴露） |
+| `tenantUid`（8 位随机串） | 对外标识，防枚举自增 ID | 全部 RPC 租户参数、登录、发码、验证码登录、登录方式发现、租户管理路径 |
 
 **租户识别方式**：
 

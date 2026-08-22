@@ -2,6 +2,7 @@ package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.OssService;
 import com.google.protobuf.ByteString;
 import lombok.RequiredArgsConstructor;
@@ -26,15 +27,16 @@ import org.apache.dubbo.config.annotation.DubboService;
 public class OssRpcServiceProtobufImpl extends DubboOssRpcServiceProtobufTriple.OssRpcServiceProtobufImplBase {
 
     private final OssService ossService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public UploadAvatarRpcResponse uploadAvatar(UploadAvatarRpcRequest request) {
         ByteString data = request.getData();
-        log.info("RPC uploadAvatar: tenantId={}, userId={}, filename={}, size={}",
-            request.getTenantId(), request.getUserId(), request.getFilename(),
+        log.info("RPC uploadAvatar: tenantUid={}, userId={}, filename={}, size={}",
+            request.getTenantUid(), request.getUserId(), request.getFilename(),
             data != null ? data.size() : 0);
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             Long userId = Long.parseLong(request.getUserId());
 
             // contentType 缺省时退回通用二进制类型，避免 OSS 元数据为空

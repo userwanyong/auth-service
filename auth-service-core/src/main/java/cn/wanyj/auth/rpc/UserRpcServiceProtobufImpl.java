@@ -4,6 +4,7 @@ import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.AssignRolesRequest;
 import cn.wanyj.auth.dto.request.UpdateUserRequest;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,13 +30,15 @@ import java.util.stream.Collectors;
 public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTriple.UserRpcServiceProtobufImplBase {
 
     private final UserService userService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public OperationResult updateUser(UpdateUserRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        Long tenantId = Long.parseLong(request.getTenantId());
-        log.info("RPC updateUser: userId={}, tenantId={}, fields={}", userId, tenantId, request.getFieldsToUpdateList());
+        log.info("RPC updateUser: userId={}, tenantUid={}, fields={}",
+            userId, request.getTenantUid(), request.getFieldsToUpdateList());
         try {
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             UpdateUserRequest updateUserRequest = new UpdateUserRequest();
             // 基于 fields_to_update 字段掩码设置待更新字段
             // 仅出现在掩码中的字段才更新（含 status=0 禁用、空字符串清空），其余保持 null（不改）
@@ -80,9 +83,10 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
     @Override
     public OperationResult updateUserStatus(UpdateUserStatusRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        Long tenantId = Long.parseLong(request.getTenantId());
-        log.info("RPC updateUserStatus: userId={}, tenantId={}, status={}", userId, tenantId, request.getStatus());
+        log.info("RPC updateUserStatus: userId={}, tenantUid={}, status={}",
+            userId, request.getTenantUid(), request.getStatus());
         try {
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             // 用户存在性与租户归属由 Service 层 loadUserAndVerifyTenant 统一校验
             //（不存在/跨租户 → USER_NOT_FOUND，由 catch 转为失败响应）
             userService.updateUserStatus(userId, tenantId, request.getStatus());
@@ -109,9 +113,10 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
     @Override
     public OperationResult assignRoles(AssignRolesRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        Long tenantId = Long.parseLong(request.getTenantId());
-        log.info("RPC assignRoles: userId={}, tenantId={}, roleIds={}", userId, tenantId, request.getRoleIdsList());
+        log.info("RPC assignRoles: userId={}, tenantUid={}, roleIds={}",
+            userId, request.getTenantUid(), request.getRoleIdsList());
         try {
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             AssignRolesRequest assignRolesRequest = AssignRolesRequest.builder()
                 .roleIds(request.getRoleIdsList().stream()
                     .map(Long::parseLong)
@@ -142,9 +147,9 @@ public class UserRpcServiceProtobufImpl extends DubboUserRpcServiceProtobufTripl
     @Override
     public OperationResult deleteUser(DeleteUserRpcRequest request) {
         Long userId = Long.parseLong(request.getUserId());
-        Long tenantId = Long.parseLong(request.getTenantId());
-        log.info("RPC deleteUser: userId={}, tenantId={}", userId, tenantId);
+        log.info("RPC deleteUser: userId={}, tenantUid={}", userId, request.getTenantUid());
         try {
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             userService.deleteUser(userId, tenantId);
 
             return OperationResult.newBuilder()

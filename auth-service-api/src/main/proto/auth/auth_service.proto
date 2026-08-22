@@ -13,14 +13,14 @@ option java_multiple_files = true;
 message LoginRpcRequest {
   string username = 1;
   string password = 2;
-  string tenantId = 3;
+  string tenantUid = 3;
 }
 
 // Register request
 message RegisterRpcRequest {
   string username = 1;
   string password = 2;
-  string tenantId = 3;
+  string tenantUid = 3;
   string email = 4;
   string phone = 5;
   string nickname = 6;
@@ -56,7 +56,8 @@ message TokenValidationResult {
   repeated string roles = 4;
   repeated string permissions = 5;
   int64 expiresAt = 6;
-  int64 tenantId = 7;
+  // 所属租户对外标识 tenantUid
+  string tenantUid = 7;
 }
 
 // User information response
@@ -70,8 +71,8 @@ message UserRpcResponse {
   int32 status = 7;
   repeated string roles = 8;
   repeated string permissions = 9;
-  // 所属租户ID（多租户隔离）
-  int64 tenantId = 10;
+  // 所属租户对外标识 tenantUid（多租户隔离）
+  string tenantUid = 10;
   // 邮箱是否已验证
   bool emailVerified = 11;
   // 最后登录时间（epoch millis，0 表示未知）
@@ -101,51 +102,51 @@ message TokenRpcResponse {
 message PermissionCheckRequest {
   string userId = 1;
   string permission = 2;
-  string tenantId = 3;
+  string tenantUid = 3;
 }
 
 // Role check request
 message RoleCheckRequest {
   string userId = 1;
   string role = 2;
-  string tenantId = 3;
+  string tenantUid = 3;
 }
 
 // User by ID request
 message UserByIdRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // User by username request
 message UserByUsernameRequest {
   string username = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // User permissions request
 message UserPermissionsRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // User roles request
 message UserRolesRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // Token generation request
 message TokenGenerationRequest {
   string userId = 1;
   int64 expiration = 2;
-  string tenantId = 3;
+  string tenantUid = 3;
 }
 
 // Search users request
 message SearchUsersRequest {
   string keyword = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   int32 page = 3;
   int32 size = 4;
 }
@@ -168,7 +169,7 @@ message StringListResponse {
 // Update user request
 message UpdateUserRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   string username = 3;
   string password = 4;
   string email = 5;
@@ -191,21 +192,21 @@ message UpdateUserRpcRequest {
 // Update user status request
 message UpdateUserStatusRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   int32 status = 3;
 }
 
 // Assign roles request
 message AssignRolesRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   repeated string roleIds = 3;
 }
 
 // Delete user request
 message DeleteUserRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // RPC operation result
@@ -230,7 +231,7 @@ message LogoutRpcRequest {
 // Change password RPC request
 message ChangePasswordRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   string oldPassword = 3;
   string newPassword = 4;
 }
@@ -249,20 +250,20 @@ message RoleRpcResponse {
 
 // Get all roles request
 message GetAllRolesRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
 }
 
 // Get role by code request
 message GetRoleByCodeRequest {
   string code = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // Get role by ID request
 message GetRoleByIdRequest {
   string roleId = 1;
-  // 租户ID，用于归属校验（防止跨租户访问）
-  string tenantId = 2;
+  // 对外租户标识，用于归属校验（防止跨租户访问）
+  string tenantUid = 2;
 }
 
 // Create role request
@@ -270,7 +271,7 @@ message CreateRoleRpcRequest {
   string code = 1;
   string name = 2;
   string description = 3;
-  string tenantId = 4;
+  string tenantUid = 4;
 }
 
 // Update role request
@@ -278,21 +279,21 @@ message UpdateRoleRpcRequest {
   string roleId = 1;
   string name = 2;
   string description = 3;
-  // 租户ID，用于归属校验（防止跨租户访问）
-  string tenantId = 4;
+  // 对外租户标识，用于归属校验（防止跨租户访问）
+  string tenantUid = 4;
 }
 
 // Delete role request
 message DeleteRoleRpcRequest {
   string roleId = 1;
-  // 租户ID，用于归属校验（防止跨租户访问）
-  string tenantId = 2;
+  // 对外租户标识，用于归属校验（防止跨租户访问）
+  string tenantUid = 2;
 }
 
 // Assign permissions to role request
 message AssignPermissionsRpcRequest {
   string roleId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   repeated string permissionIds = 3;
 }
 
@@ -315,14 +316,14 @@ message PermissionRpcResponse {
 
 // Get all permissions request
 message GetAllPermissionsRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
 }
 
 // Get permission by ID request
 message GetPermissionByIdRequest {
   string permissionId = 1;
-  // 租户ID，用于归属校验（防止跨租户访问）
-  string tenantId = 2;
+  // 对外租户标识，用于归属校验（防止跨租户访问）
+  string tenantUid = 2;
 }
 
 // Create permission request
@@ -332,14 +333,14 @@ message CreatePermissionRpcRequest {
   string resource = 3;
   string action = 4;
   string description = 5;
-  string tenantId = 6;
+  string tenantUid = 6;
 }
 
 // Delete permission request
 message DeletePermissionRpcRequest {
   string permissionId = 1;
-  // 租户ID，用于归属校验（防止跨租户访问）
-  string tenantId = 2;
+  // 对外租户标识，用于归属校验（防止跨租户访问）
+  string tenantUid = 2;
 }
 
 // Permissions list response
@@ -394,8 +395,8 @@ message ParseTokenRpcRequest {
 // Revoke all tokens RPC request
 message RevokeAllTokensRpcRequest {
   string userId = 1;
-  // 租户ID，用于归属校验（防止跨租户操作）
-  string tenantId = 2;
+  // 对外租户标识，留空跳过归属校验；非空须为有效租户
+  string tenantUid = 2;
 }
 
 // ==================== Wrapper Types ====================
@@ -452,7 +453,7 @@ message OAuthAuthorizeUrlRpcRequest {
 
 // Build OAuth bind-authorize URL request (bind flow)
 message OAuthBindUrlRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
   string userId = 2;
   // 提供方：gitee / github
   string provider = 3;
@@ -489,7 +490,7 @@ message OAuthCallbackRpcResult {
 
 // List OAuth bindings request
 message OAuthBindingsRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
   string userId = 2;
 }
 
@@ -511,7 +512,7 @@ message OAuthBindingListRpcResponse {
 
 // Unbind OAuth provider request
 message OAuthUnbindRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
   string userId = 2;
   string provider = 3;
 }
@@ -521,7 +522,7 @@ message OAuthUnbindRpcRequest {
 // Bind/replace email or phone RPC request (after code verification)
 message BindContactRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
   // 登录方式：email:aliyun / email:smtp（绑定邮箱）/ sms:aliyun（绑定手机），须与发码时一致
   string method = 3;
   // 目标：邮箱地址或手机号
@@ -533,7 +534,7 @@ message BindContactRpcRequest {
 // Unbind email/phone RPC request
 message ContactUnbindRpcRequest {
   string userId = 1;
-  string tenantId = 2;
+  string tenantUid = 2;
 }
 
 // ==================== Login Method Config Messages ====================
@@ -575,12 +576,12 @@ message SavePlatformLoginMethodRpcRequest {
 
 // List tenant-level login method configs request
 message TenantLoginMethodRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
 }
 
 // Save tenant-level login method config request
 message SaveTenantLoginMethodRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
   // 登录方式 code（须平台已开启）
   string method = 2;
   // 是否启用：0-否，1-是
@@ -601,7 +602,7 @@ message EnabledLoginMethodsRpcRequest {
 
 // Upload avatar RPC request
 message UploadAvatarRpcRequest {
-  string tenantId = 1;
+  string tenantUid = 1;
   // 头像归属用户 ID（编辑已有用户传目标 id，新建场景传操作者 id）
   string userId = 2;
   // 原始文件名（校验扩展名白名单：jpg/jpeg/png/gif/webp）

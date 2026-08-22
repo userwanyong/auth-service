@@ -4,6 +4,7 @@ import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.LoginMethodConfigSaveRequest;
 import cn.wanyj.auth.dto.response.LoginMethodConfigVO;
 import cn.wanyj.auth.exception.BusinessException;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.LoginMethodConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.util.List;
 public class LoginMethodRpcServiceProtobufImpl extends DubboLoginMethodRpcServiceProtobufTriple.LoginMethodRpcServiceProtobufImplBase {
 
     private final LoginMethodConfigService loginMethodConfigService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public LoginMethodListRpcResponse listPlatformConfigs(Empty request) {
@@ -73,9 +75,9 @@ public class LoginMethodRpcServiceProtobufImpl extends DubboLoginMethodRpcServic
 
     @Override
     public LoginMethodListRpcResponse listTenantConfigs(TenantLoginMethodRpcRequest request) {
-        log.info("RPC listTenantConfigs: tenantId={}", request.getTenantId());
+        log.info("RPC listTenantConfigs: tenantUid={}", request.getTenantUid());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             return toListResponse(loginMethodConfigService.listTenantConfigs(tenantId));
         } catch (Exception e) {
             log.error("List tenant configs error", e);
@@ -85,10 +87,10 @@ public class LoginMethodRpcServiceProtobufImpl extends DubboLoginMethodRpcServic
 
     @Override
     public OperationResult saveTenantConfig(SaveTenantLoginMethodRpcRequest request) {
-        log.info("RPC saveTenantConfig: tenantId={}, method={}, enabled={}",
-            request.getTenantId(), request.getMethod(), request.getEnabled());
+        log.info("RPC saveTenantConfig: tenantUid={}, method={}, enabled={}",
+            request.getTenantUid(), request.getMethod(), request.getEnabled());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             LoginMethodConfigSaveRequest saveRequest = LoginMethodConfigSaveRequest.builder()
                 .enabled(request.getEnabled())
                 .usePlatformConfig(request.getUsePlatformConfig())

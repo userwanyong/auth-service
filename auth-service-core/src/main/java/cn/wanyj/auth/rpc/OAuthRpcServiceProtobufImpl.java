@@ -5,6 +5,7 @@ import cn.wanyj.auth.dto.response.TokenResponse;
 import cn.wanyj.auth.entity.UserOauth;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.rpc.converter.UserProtobufConverter;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.oauth.OAuthCallbackResult;
 import cn.wanyj.auth.service.oauth.OAuthLoginService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import java.util.List;
 public class OAuthRpcServiceProtobufImpl extends DubboOAuthRpcServiceProtobufTriple.OAuthRpcServiceProtobufImplBase {
 
     private final OAuthLoginService oAuthLoginService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public OAuthUrlRpcResponse buildAuthorizeUrl(OAuthAuthorizeUrlRpcRequest request) {
@@ -51,10 +53,10 @@ public class OAuthRpcServiceProtobufImpl extends DubboOAuthRpcServiceProtobufTri
 
     @Override
     public OAuthUrlRpcResponse buildBindAuthorizeUrl(OAuthBindUrlRpcRequest request) {
-        log.info("RPC buildBindAuthorizeUrl: tenantId={}, userId={}, provider={}",
-            request.getTenantId(), request.getUserId(), request.getProvider());
+        log.info("RPC buildBindAuthorizeUrl: tenantUid={}, userId={}, provider={}",
+            request.getTenantUid(), request.getUserId(), request.getProvider());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             Long userId = Long.parseLong(request.getUserId());
             String url = oAuthLoginService.buildBindAuthorizeUrl(tenantId, request.getProvider(), userId);
             return OAuthUrlRpcResponse.newBuilder().setUrl(url).build();
@@ -111,9 +113,9 @@ public class OAuthRpcServiceProtobufImpl extends DubboOAuthRpcServiceProtobufTri
 
     @Override
     public OAuthBindingListRpcResponse listBindings(OAuthBindingsRpcRequest request) {
-        log.info("RPC listBindings: tenantId={}, userId={}", request.getTenantId(), request.getUserId());
+        log.info("RPC listBindings: tenantUid={}, userId={}", request.getTenantUid(), request.getUserId());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             Long userId = Long.parseLong(request.getUserId());
             List<UserOauth> bindings = oAuthLoginService.listBindings(tenantId, userId);
 
@@ -140,10 +142,10 @@ public class OAuthRpcServiceProtobufImpl extends DubboOAuthRpcServiceProtobufTri
 
     @Override
     public OperationResult unbind(OAuthUnbindRpcRequest request) {
-        log.info("RPC unbind: tenantId={}, userId={}, provider={}",
-            request.getTenantId(), request.getUserId(), request.getProvider());
+        log.info("RPC unbind: tenantUid={}, userId={}, provider={}",
+            request.getTenantUid(), request.getUserId(), request.getProvider());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             Long userId = Long.parseLong(request.getUserId());
             oAuthLoginService.unbind(tenantId, userId, request.getProvider());
 

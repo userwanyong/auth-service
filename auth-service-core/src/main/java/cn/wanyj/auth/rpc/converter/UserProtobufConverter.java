@@ -22,8 +22,19 @@ public final class UserProtobufConverter {
 
     /**
      * UserResponse（完整用户信息）→ UserRpcResponse
+     * <p>tenantUid 取 {@link UserResponse#getTenantUid()}（可能为空）；
+     * RPC 层已解析出租户时请用 {@link #convertToProtobuf(UserResponse, String)}。</p>
      */
     public static UserRpcResponse convertToProtobuf(UserResponse user) {
+        return convertToProtobuf(user, user.getTenantUid());
+    }
+
+    /**
+     * UserResponse（完整用户信息）→ UserRpcResponse，显式指定租户标识
+     *
+     * @param tenantUid 租户对外标识（RPC 层按入参 tenantUid 解析得到），可为 null
+     */
+    public static UserRpcResponse convertToProtobuf(UserResponse user, String tenantUid) {
         return UserRpcResponse.newBuilder()
                 .setId(user.getId())
                 .setUsername(user.getUsername())
@@ -34,7 +45,7 @@ public final class UserProtobufConverter {
                 .setStatus(user.getStatus())
                 .addAllRoles(user.getRoles() != null ? user.getRoles() : Collections.emptyList())
                 .addAllPermissions(user.getPermissions() != null ? user.getPermissions() : Collections.emptyList())
-                .setTenantId(user.getTenantId() != null ? user.getTenantId() : 0L)
+                .setTenantUid(tenantUid != null ? tenantUid : "")
                 .setEmailVerified(user.getEmailVerified() != null && user.getEmailVerified())
                 .setPhoneVerified(user.getPhoneVerified() != null && user.getPhoneVerified())
                 .setRealName(user.getRealName() != null ? user.getRealName() : "")

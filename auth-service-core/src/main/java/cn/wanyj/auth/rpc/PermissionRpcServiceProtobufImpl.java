@@ -2,8 +2,10 @@ package cn.wanyj.auth.rpc;
 
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.response.PermissionResponse;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.rpc.converter.PermissionProtobufConverter;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +31,13 @@ import java.util.List;
 public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceProtobufTriple.PermissionRpcServiceProtobufImplBase {
 
     private final PermissionService permissionService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public PermissionListResponse getAllPermissions(GetAllPermissionsRequest request) {
-        log.info("RPC getAllPermissions: tenantId={}", request.getTenantId());
+        log.info("RPC getAllPermissions: tenantUid={}", request.getTenantUid());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             List<PermissionResponse> permissions = permissionService.getAllPermissions(tenantId);
 
             PermissionListResponse.Builder builder = PermissionListResponse.newBuilder();
@@ -43,20 +46,20 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
             }
             return builder.build();
         } catch (Exception e) {
-            log.error("Failed to get all permissions for tenant: {}", request.getTenantId(), e);
+            log.error("Failed to get all permissions for tenant: {}", request.getTenantUid(), e);
             return PermissionListResponse.getDefaultInstance();
         }
     }
 
     @Override
     public PermissionRpcResponse getPermissionById(GetPermissionByIdRequest request) {
-        log.info("RPC getPermissionById: permissionId={}, tenantId={}", request.getPermissionId(), request.getTenantId());
+        log.info("RPC getPermissionById: permissionId={}, tenantUid={}", request.getPermissionId(), request.getTenantUid());
         try {
             Long permissionId = Long.parseLong(request.getPermissionId());
-            // tenantId 为空（旧客户端）时跳过归属校验，非空时强制校验
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            // tenantUid 留空时跳过归属校验，非空时强制校验
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
 
-            PermissionResponse permission = permissionService.getPermissionById(permissionId, tenantId);
+            PermissionResponse permission = permissionService.getPermissionById(permissionId, tenant != null ? tenant.getId() : null);
             return PermissionProtobufConverter.convertToProtobuf(permission);
         } catch (BusinessException e) {
             log.warn("getPermissionById failed: {}", e.getMessage());
@@ -69,7 +72,7 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
 
     @Override
     public PermissionRpcResponse createPermission(CreatePermissionRpcRequest request) {
-        log.info("RPC createPermission: code={}, tenantId={}", request.getCode(), request.getTenantId());
+        log.info("RPC createPermission: code={}, tenantUid={}", request.getCode(), request.getTenantUid());
         try {
             PermissionResponse response = permissionService.createPermission(
                 request.getCode(),
@@ -77,7 +80,7 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
                 request.getResource(),
                 request.getAction(),
                 request.getDescription(),
-                Long.parseLong(request.getTenantId())
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId()
             );
             return PermissionProtobufConverter.convertToProtobuf(response);
         } catch (BusinessException e) {
@@ -94,8 +97,8 @@ public class PermissionRpcServiceProtobufImpl extends DubboPermissionRpcServiceP
         log.info("RPC deletePermission: permissionId={}", request.getPermissionId());
         try {
             Long permissionId = Long.parseLong(request.getPermissionId());
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
-            permissionService.deletePermission(permissionId, tenantId);
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
+            permissionService.deletePermission(permissionId, tenant != null ? tenant.getId() : null);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("权限删除成功")

@@ -3,8 +3,10 @@ package cn.wanyj.auth.rpc;
 import cn.wanyj.auth.api.protobuf.*;
 import cn.wanyj.auth.dto.request.AssignPermissionsRequest;
 import cn.wanyj.auth.dto.response.RoleResponse;
+import cn.wanyj.auth.entity.Tenant;
 import cn.wanyj.auth.exception.BusinessException;
 import cn.wanyj.auth.rpc.converter.RoleProtobufConverter;
+import cn.wanyj.auth.rpc.support.TenantUidResolver;
 import cn.wanyj.auth.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +33,13 @@ import java.util.stream.Collectors;
 public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTriple.RoleRpcServiceProtobufImplBase {
 
     private final RoleService roleService;
+    private final TenantUidResolver tenantUidResolver;
 
     @Override
     public RoleListResponse getAllRoles(GetAllRolesRequest request) {
-        log.info("RPC getAllRoles: tenantId={}", request.getTenantId());
+        log.info("RPC getAllRoles: tenantUid={}", request.getTenantUid());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             List<RoleResponse> roles = roleService.getAllRoles(tenantId);
 
             RoleListResponse.Builder builder = RoleListResponse.newBuilder();
@@ -45,37 +48,37 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
             }
             return builder.build();
         } catch (Exception e) {
-            log.error("Failed to get all roles for tenant: {}", request.getTenantId(), e);
+            log.error("Failed to get all roles for tenant: {}", request.getTenantUid(), e);
             return RoleListResponse.getDefaultInstance();
         }
     }
 
     @Override
     public RoleRpcResponse getRoleByCode(GetRoleByCodeRequest request) {
-        log.info("RPC getRoleByCode: code={}, tenantId={}", request.getCode(), request.getTenantId());
+        log.info("RPC getRoleByCode: code={}, tenantUid={}", request.getCode(), request.getTenantUid());
         try {
-            Long tenantId = Long.parseLong(request.getTenantId());
+            Long tenantId = tenantUidResolver.requireTenant(request.getTenantUid()).getId();
             RoleResponse role = roleService.getRoleByCode(request.getCode(), tenantId);
             return RoleProtobufConverter.convertToProtobuf(role);
         } catch (BusinessException e) {
             log.warn("getRoleByCode failed: {}", e.getMessage());
             return RoleRpcResponse.getDefaultInstance();
         } catch (Exception e) {
-            log.error("Failed to get role by code: code={}, tenantId={}",
-                request.getCode(), request.getTenantId(), e);
+            log.error("Failed to get role by code: code={}, tenantUid={}",
+                request.getCode(), request.getTenantUid(), e);
             return RoleRpcResponse.getDefaultInstance();
         }
     }
 
     @Override
     public RoleRpcResponse getRoleById(GetRoleByIdRequest request) {
-        log.info("RPC getRoleById: roleId={}, tenantId={}", request.getRoleId(), request.getTenantId());
+        log.info("RPC getRoleById: roleId={}, tenantUid={}", request.getRoleId(), request.getTenantUid());
         try {
             Long roleId = Long.parseLong(request.getRoleId());
-            // tenantId 为空（旧客户端）时跳过归属校验，非空时强制校验
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            // tenantUid 留空时跳过归属校验，非空时强制校验
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
 
-            RoleResponse role = roleService.getRoleById(roleId, tenantId);
+            RoleResponse role = roleService.getRoleById(roleId, tenant != null ? tenant.getId() : null);
             return RoleProtobufConverter.convertToProtobuf(role);
         } catch (BusinessException e) {
             log.warn("getRoleById failed: {}", e.getMessage());
@@ -88,13 +91,13 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
 
     @Override
     public RoleRpcResponse createRole(CreateRoleRpcRequest request) {
-        log.info("RPC createRole: code={}, tenantId={}", request.getCode(), request.getTenantId());
+        log.info("RPC createRole: code={}, tenantUid={}", request.getCode(), request.getTenantUid());
         try {
             RoleResponse roleResponse = roleService.createRole(
                 request.getCode(),
                 request.getName(),
                 request.getDescription(),
-                Long.parseLong(request.getTenantId())
+                tenantUidResolver.requireTenant(request.getTenantUid()).getId()
             );
             return RoleProtobufConverter.convertToProtobuf(roleResponse);
         } catch (BusinessException e) {
@@ -110,8 +113,9 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
     public OperationResult updateRole(UpdateRoleRpcRequest request) {
         log.info("RPC updateRole: roleId={}", request.getRoleId());
         try {
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
-            roleService.updateRole(Long.parseLong(request.getRoleId()), request.getName(), request.getDescription(), tenantId);
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
+            roleService.updateRole(Long.parseLong(request.getRoleId()), request.getName(), request.getDescription(),
+                tenant != null ? tenant.getId() : null);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("角色更新成功")
@@ -135,8 +139,8 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
     public OperationResult deleteRole(DeleteRoleRpcRequest request) {
         log.info("RPC deleteRole: roleId={}", request.getRoleId());
         try {
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
-            roleService.deleteRole(Long.parseLong(request.getRoleId()), tenantId);
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
+            roleService.deleteRole(Long.parseLong(request.getRoleId()), tenant != null ? tenant.getId() : null);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("角色删除成功")
@@ -158,16 +162,16 @@ public class RoleRpcServiceProtobufImpl extends DubboRoleRpcServiceProtobufTripl
 
     @Override
     public OperationResult assignPermissions(AssignPermissionsRpcRequest request) {
-        log.info("RPC assignPermissions: roleId={}, tenantId={}, permissionIds={}",
-            request.getRoleId(), request.getTenantId(), request.getPermissionIdsList());
+        log.info("RPC assignPermissions: roleId={}, tenantUid={}, permissionIds={}",
+            request.getRoleId(), request.getTenantUid(), request.getPermissionIdsList());
         try {
             Long roleId = Long.parseLong(request.getRoleId());
-            Long tenantId = request.getTenantId().isBlank() ? null : Long.parseLong(request.getTenantId());
+            Tenant tenant = tenantUidResolver.resolveTenantOrNull(request.getTenantUid());
             AssignPermissionsRequest assignRequest = AssignPermissionsRequest.builder()
                 .permissionIds(request.getPermissionIdsList().stream().map(Long::parseLong).collect(Collectors.toList()))
                 .build();
 
-            roleService.assignPermissions(roleId, assignRequest, tenantId);
+            roleService.assignPermissions(roleId, assignRequest, tenant != null ? tenant.getId() : null);
             return OperationResult.newBuilder()
                 .setSuccess(true)
                 .setMessage("权限分配成功")

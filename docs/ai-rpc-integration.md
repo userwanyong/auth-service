@@ -32,7 +32,7 @@ auth-service 是一个多租户认证授权微服务，通过 **Dubbo 3 Triple �
 2. 消费方工程加入 Dubbo + Nacos 依赖与配置（[第 3 节](#3-消费方工程配置完整可复制)）
 3. 每次调用前在 Dubbo attachment 中设置 `rpc-service-token`（[第 4 节](#4-服务鉴权rpc-service-token)）
 4. 用 `@DubboReference(version = "1.0.0")` 注入接口（如 `AuthRpcServiceProtobuf`）
-5. 按第 5 节的约定构造请求、判断成败（**ID 一律传数字字符串**；失败不抛业务异常，按响应字段判断）
+5. 按第 5 节的约定构造请求、判断成败（**租户一律传 `tenantUid` 随机串，其余 ID 传数字字符串**；失败不抛业务异常，按响应字段判断）
 
 ## 1. 服务定位信息
 
@@ -195,12 +195,12 @@ public class AuthGateway {
     @DubboReference(version = "1.0.0", timeout = 5000)
     private AuthRpcServiceProtobuf authRpc;
 
-    public UserRpcResponse getUserById(long userId, long tenantId) {
+    public UserRpcResponse getUserById(long userId, String tenantUid) {
         RpcContext.getClientAttachment().setAttachment("rpc-service-token", rpcToken);
         try {
             return authRpc.getUserById(UserByIdRequest.newBuilder()
                     .setUserId(String.valueOf(userId))
-                    .setTenantId(String.valueOf(tenantId))
+                    .setTenantUid(tenantUid)
                     .build());
         } catch (RpcException e) {
             // 网络失败 / 鉴权失败 / 超时：只有这一类是"抛异常"
@@ -214,37 +214,34 @@ public class AuthGateway {
 
 **这 8 条规则覆盖了所有已知的"调用失败/结果误判"陷阱，集成前请完整阅读。**
 
-### 规则 1：所有 ID 字段一律传「数字字符串」
+### 规则 1：业务 ID 传「数字字符串」，租户传 `tenantUid` 随机串
 
-proto 中 `userId`、`tenantId`、`roleId`、`permissionId` 等均为 `string` 类型（防止 JS 大整数精度丢失），但服务端会按 `Long.parseLong` 解析。因此：
+proto 中 `userId`、`roleId`、`permissionId` 等业务 ID 均为 `string` 类型（防止 JS 大整数精度丢失），服务端按 `Long.parseLong` 解析；租户统一用对外标识 `tenantUid`（8 位 [a-z0-9] 随机串，如 `"dm3a9x1f"`），服务端自行解析为内部数字 ID。
 
 ```java
-// ✅ 正确：数字的字符串形式
-.setUserId("123456789012345")
-.setTenantId("1")
+// ✅ 正确
+.setUserId("123456789012345")   // 业务 ID：数字的字符串形式
+.setTenantUid("dm3a9x1f")       // 租户：对外随机串
 
-// ❌ 错误：会解析失败，表现为"资源不存在"
-.setUserId("")              // 空串
-.setTenantId("dm3a9x1f")    // 这不是数字！见规则 2
-.setUserId(null)            // proto3 string 无 null，等价于空串
+// ❌ 错误：会按"失败"语义返回
+.setUserId("")                  // 空串
+.setUserId(null)                // proto3 string 无 null，等价于空串
+.setTenantUid("1")              // 这不是 tenantUid！数字 ID 已不再对外使用
 ```
 
-**除 `revokeAllTokens` 的 `tenantId` 可空外，所有 ID 字段必填。** 传空串的后果是 `NumberFormatException` 被服务端捕获，按"失败"语义返回（见规则 4），不会抛异常给你，容易误判为"用户不存在"。
+**除规则 3 列出的少数允许 `tenantUid` 留空的方法外，所有字段必填。** 传空串的后果是 `NumberFormatException` 被服务端捕获，按"失败"语义返回（见规则 4），不会抛异常给你，容易误判为"用户不存在"。
 
-### 规则 2：分清两种租户标识（最常见的调用错误）
+### 规则 2：租户唯一标识是 `tenantUid`（随机串）
 
-| 标识 | 形态 | 示例 | 用它的方法 |
-|------|------|------|-----------|
-| **`tenantId`（内部数字 ID）** | 纯数字字符串 | `"0"`、`"1"` | 绝大多数方法（注册、登录 authenticate、用户/角色/权限管理、绑定、令牌） |
-| **`tenantUid`（对外随机标识）** | 8 位 [a-z0-9] | `"dm3a9x1f"` | 仅 4 个方法：`sendCode`、`loginByCode`、`buildAuthorizeUrl`、`listEnabledMethods` |
+所有 RPC 方法的租户参数统一为 `tenantUid`——8 位 [a-z0-9] 对外随机标识（如 `"dm3a9x1f"`）。内部数字 `tenantId` 已**不再出现在任何 RPC 入参/出参**中，服务端在内部自行完成 `tenantUid → tenantId` 解析。
 
-初始数据：平台租户 `tenantId="0"`，演示租户 `tenantId="1"`。新建租户的 `tenantId` 由创建接口返回（数字），`tenantUid` 为随机串。**请求字段名叫 `tenantUid` 的，传随机串；叫 `tenantId` 的，传数字字符串。**
+获取 tenantUid：租户创建接口（HTTP 管理端）返回，或向 auth-service 运维方查询。传错/传空（必填方法）→ 按失败语义返回（message「租户无效或不存在」，错误码 1015）。
 
-### 规则 3：`tenantId` 非空即触发归属校验（防跨租户）
+### 规则 3：`tenantUid` 非空即触发归属校验（防跨租户）
 
-按 ID 操作资源的方法，服务端会校验「该资源是否属于你传的 `tenantId`」。不属于时**不报错，按不存在处理**（返回空实例或 `success=false`），避免泄露资源存在性。
+按 ID 操作资源的方法，服务端会校验「该资源是否属于你传的 `tenantUid` 对应的租户」。不属于时**不报错，按不存在处理**（返回空实例或 `success=false`），避免泄露资源存在性。
 
-这意味着：传错租户 ID 的表现与资源不存在完全相同。排查"明明有这个用户却查不到"时，先核对 tenantId。
+少数方法允许 `tenantUid` 留空：`revokeAllTokens`、`generateToken`、`getRoleById`/`updateRole`/`deleteRole`/`assignPermissions`、`getPermissionById`/`deletePermission`——留空=跳过归属校验，非空则必须有效。传错租户的表现与资源不存在完全相同，排查"明明有这个用户却查不到"时先核对 tenantUid。
 
 ### 规则 4：业务失败不抛异常，按响应形态判断成败
 
@@ -275,7 +272,7 @@ proto3 无法区分「未设置」与「零值」。`UpdateUserRpcRequest` 只�
 ```java
 UpdateUserRpcRequest.newBuilder()
     .setUserId("123456")
-    .setTenantId("1")
+    .setTenantUid("dm3a9x1f")
     .setNickname("新昵称")
     .setStatus(0)                    // 0 = 禁用。不进掩码则会被当作"未提供"而不生效
     .addFieldsToUpdate("nickname")   // 可选值见 7.3 节
@@ -285,9 +282,9 @@ UpdateUserRpcRequest.newBuilder()
 
 ### 规则 7：令牌相关语义
 
-- `parseToken` 只校验**Access Token**（黑名单+签名+过期），适合网关/微服务对每个请求鉴权；返回 `userId`、`tenantId`、`roles`、`permissions`、`expiresAt`（epoch 毫秒）
+- `parseToken` 只校验**Access Token**（黑名单+签名+过期），适合网关/微服务对每个请求鉴权；返回 `userId`、`tenantUid`、`roles`、`permissions`、`expiresAt`（epoch 毫秒）
 - `refreshToken` 校验 Refresh Token 且与 Redis 单点存储匹配，成功**轮换**返回新令牌对（旧的立即失效）
-- `generateToken` 的 `expiration` 单位是**秒**，`<= 0` 时使用服务端默认（900 秒）；`tenantId` 传 `"0"` 表示不限定租户
+- `generateToken` 的 `expiration` 单位是**秒**，`<= 0` 时使用服务端默认（900 秒）；`tenantUid` 留空表示不限定租户
 - `revokeAllTokens` **只删除 Redis 中的 Refresh Token，不拉黑已发放的 Access Token**（Access Token 剩余生命周期内仍可解析），且静默执行不报失败
 
 ### 规则 8：写操作必须关闭重试
@@ -315,7 +312,7 @@ private AuthRpcServiceProtobuf authRpcService;
 | `status` | `int` | 1-正常，0-禁用 |
 | `roles` | `List<String>` | 角色编码，如 `ROLE_ADMIN`；用 `getRolesList()` |
 | `permissions` | `List<String>` | 权限编码，如 `user:read`；用 `getPermissionsList()` |
-| `tenantId` | `long` | 所属租户 |
+| `tenantUid` | `String` | 所属租户对外标识（8 位随机串） |
 | `emailVerified` / `phoneVerified` | `boolean` | 联系方式验证标记 |
 | `lastLoginAt` / `createdAt` / `updatedAt` | `long` | epoch 毫秒，0=未知 |
 | `realName` | `String` | 真实姓名 |
@@ -337,7 +334,7 @@ private AuthRpcServiceProtobuf authRpcService;
 | `valid` | `boolean` | 令牌是否有效（唯一成败标志） |
 | `userId` | `long` | 用户 ID |
 | `username` | `String` | 用户名 |
-| `tenantId` | `long` | 租户 ID |
+| `tenantUid` | `String` | 租户对外标识（8 位随机串） |
 | `roles` / `permissions` | `List<String>` | 角色 / 权限编码 |
 | `expiresAt` | `long` | 过期时间（epoch 毫秒） |
 
@@ -396,7 +393,7 @@ private AuthRpcServiceProtobuf authRpcService;
 |----------|------|------|
 | `username` | 是 | 3~50 位，仅字母/数字/下划线，租户内唯一 |
 | `password` | 是 | 6~50 位 |
-| `tenantId` | 是 | **数字字符串**（如 `"1"`） |
+| `tenantUid` | 是 | 对外租户标识（8 位随机串，如 `"dm3a9x1f"`） |
 | `email` / `phone` | 否 | 提供则校验格式与租户内唯一 |
 | `nickname` / `realName` | 否 | ≤50 字符 |
 | `gender` | 否 | 0/1/2 |
@@ -406,13 +403,13 @@ private AuthRpcServiceProtobuf authRpcService;
 
 #### `authenticate(LoginRpcRequest) → AuthResult`
 
-账号密码登录校验。**注意：入参是数字 `tenantId`，不是 tenantUid。**
+账号密码登录校验（租户由 `tenantUid` 标识）。
 
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
 | `username` | 是 | 用户名 |
 | `password` | 是 | 密码 |
-| `tenantId` | 是 | 数字字符串 |
+| `tenantUid` | 是 | 对外租户标识（随机串） |
 
 成功：`success=true` + `userId` + `username`。**此方法只做校验，不返回令牌**；需要令牌用 `register` / `loginByCode`（直接返回令牌）或 `generateToken`（已登录用户补发）。
 
@@ -421,13 +418,13 @@ private AuthRpcServiceProtobuf authRpcService;
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
 | `userId` | 是 | 数字字符串 |
-| `tenantId` | 是 | 数字字符串，触发归属校验 |
+| `tenantUid` | 是 | 对外租户标识（随机串），触发归属校验 |
 
 失败/不存在/跨租户/禁用 → `id == 0`（规则 4、5）。
 
 #### `getUserByUsername(UserByUsernameRequest) → UserRpcResponse`
 
-字段：`username`（必填）、`tenantId`（必填，数字字符串）。行为同上。
+字段：`username`（必填）、`tenantUid`（必填，随机串）。行为同上。
 
 #### `hasPermission(PermissionCheckRequest) → BoolValue`
 
@@ -435,27 +432,27 @@ private AuthRpcServiceProtobuf authRpcService;
 |----------|------|------|
 | `userId` | 是 | 数字字符串 |
 | `permission` | 是 | 权限编码，如 `user:read`（注意：权限按租户隔离，需是**该租户已定义**的编码） |
-| `tenantId` | 是 | 数字字符串 |
+| `tenantUid` | 是 | 对外租户标识（随机串） |
 
 用户不存在/跨租户/禁用/无此权限 → `value=false`。
 
 #### `hasRole(RoleCheckRequest) → BoolValue`
 
-字段：`userId`、`role`（如 `ROLE_ADMIN`）、`tenantId`（均必填，ID 数字字符串）。行为同上。
+字段：`userId`、`role`（如 `ROLE_ADMIN`）、`tenantUid`（均必填；userId 数字字符串，tenantUid 随机串）。行为同上。
 
 #### `getUserPermissions(UserPermissionsRequest) → StringListResponse`
 
-字段：`userId`、`tenantId`（必填）。返回 `getValuesList()` 权限编码列表；失败/无权限 → 空列表。
+字段：`userId`、`tenantUid`（必填）。返回 `getValuesList()` 权限编码列表；失败/无权限 → 空列表。
 
 #### `getUserRoles(UserRolesRequest) → StringListResponse`
 
-字段：`userId`、`tenantId`（必填）。返回角色编码列表。
+字段：`userId`、`tenantUid`（必填）。返回角色编码列表。
 
 #### `searchUsers(SearchUsersRequest) → UserPageResponse`
 
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
-| `tenantId` | 是 | 数字字符串 |
+| `tenantUid` | 是 | 对外租户标识（随机串） |
 | `keyword` | 否 | 匹配用户名/昵称/邮箱 |
 | `page` | 否 | **从 1 开始**，`<=0` 修正为 1 |
 | `size` | 否 | 默认 10 |
@@ -481,7 +478,7 @@ private AuthRpcServiceProtobuf authRpcService;
 
 #### `changePassword(ChangePasswordRpcRequest) → OperationResult`
 
-字段：`userId`、`tenantId`（数字字符串）、`oldPassword`、`newPassword`（6~50 位）。旧密码错误 → `success=false`（message「旧密码错误」）。**改密不撤销已有令牌**，如需强制下线另行调用 `revokeAllTokens`。
+字段：`userId`、`tenantUid`（随机串）、`oldPassword`、`newPassword`（6~50 位）。旧密码错误 → `success=false`（message「旧密码错误」）。**改密不撤销已有令牌**，如需强制下线另行调用 `revokeAllTokens`。
 
 #### `sendCode(SendCodeRpcRequest) → OperationResult`
 
@@ -521,7 +518,7 @@ private AuthRpcServiceProtobuf authRpcService;
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
 | `userId` | 是 | 数字字符串，须存在且未禁用 |
-| `tenantId` | 是 | 数字字符串；传 `"0"` 表示不限定租户（校验跳过归属） |
+| `tenantUid` | 否 | 对外租户标识；留空=不限定租户（跳过归属校验） |
 | `expiration` | 否 | Access Token 有效**秒数**，`<=0` 用默认 900 |
 
 为已存在用户直接签发令牌对（跳过密码校验，适用于内部系统受信场景）。失败 → 空实例。
@@ -531,7 +528,7 @@ private AuthRpcServiceProtobuf authRpcService;
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
 | `userId` | 是 | 数字字符串 |
-| `tenantId` | 否 | 数字字符串；**唯一允许为空的 tenantId**——空=跳过归属校验 |
+| `tenantUid` | 否 | 对外租户标识；**留空=跳过归属校验**（规则 3） |
 
 删除该用户的 Refresh Token。**静默执行**：任何失败都不反映在响应中（规则 7）。
 
@@ -541,7 +538,7 @@ private AuthRpcServiceProtobuf authRpcService;
 
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
-| `userId` / `tenantId` | 是 | 数字字符串 |
+| `userId` / `tenantUid` | 是 | userId 数字字符串；tenantUid 对外随机串 |
 | `fields_to_update` | 是 | **字段掩码**（规则 6），可重复 |
 | `username` / `password` / `email` / `phone` / `nickname` / `avatar` / `status` / `realName` / `gender` / `birthday` | 否 | 仅掩码内字段生效 |
 
@@ -551,36 +548,36 @@ private AuthRpcServiceProtobuf authRpcService;
 
 #### `updateUserStatus(UpdateUserStatusRpcRequest) → OperationResult`
 
-字段：`userId`、`tenantId`（数字字符串）、`status`（int，1-正常 0-禁用）。
+字段：`userId`、`tenantUid`（随机串）、`status`（int，1-正常 0-禁用）。
 
 #### `assignRoles(AssignRolesRpcRequest) → OperationResult`
 
-字段：`userId`、`tenantId`（数字字符串）、`roleIds`（**全量覆盖**：传最终目标角色 ID 列表，可重复 add；空列表=清空角色）。
+字段：`userId`、`tenantUid`（随机串）、`roleIds`（**全量覆盖**：传最终目标角色 ID 列表，可重复 add；空列表=清空角色）。
 
 #### `deleteUser(DeleteUserRpcRequest) → OperationResult`
 
-字段：`userId`、`tenantId`（数字字符串）。
+字段：`userId`、`tenantUid`（随机串）。
 
 ### 7.4 RoleRpcServiceProtobuf —— 角色管理
 
-| 方法 | 请求关键字段（ID 均数字字符串） | 失败语义 |
+| 方法 | 请求关键字段（业务 ID 数字字符串；tenantUid 为随机串） | 失败语义 |
 |------|-------------------------------|----------|
-| `getAllRoles(GetAllRolesRequest)` | `tenantId` | 失败/无数据 → 空列表 |
-| `getRoleByCode(GetRoleByCodeRequest)` | `code`、`tenantId` | 失败 → `id==0` 空实例 |
-| `getRoleById(GetRoleByIdRequest)` | `roleId`、`tenantId` | 同上 |
-| `createRole(CreateRoleRpcRequest)` | `code`、`name`、`description`、`tenantId` | 成功返回新建角色；重复编码 → `id==0` |
-| `updateRole(UpdateRoleRpcRequest)` | `roleId`、`name`、`description`、`tenantId` | OperationResult |
-| `deleteRole(DeleteRoleRpcRequest)` | `roleId`、`tenantId` | OperationResult |
-| `assignPermissions(AssignPermissionsRpcRequest)` | `roleId`、`tenantId`、`permissionIds`（全量覆盖） | OperationResult |
+| `getAllRoles(GetAllRolesRequest)` | `tenantUid` | 失败/无数据 → 空列表 |
+| `getRoleByCode(GetRoleByCodeRequest)` | `code`、`tenantUid` | 失败 → `id==0` 空实例 |
+| `getRoleById(GetRoleByIdRequest)` | `roleId`、`tenantUid`（可空，规则 3） | 同上 |
+| `createRole(CreateRoleRpcRequest)` | `code`、`name`、`description`、`tenantUid` | 成功返回新建角色；重复编码 → `id==0` |
+| `updateRole(UpdateRoleRpcRequest)` | `roleId`、`name`、`description`、`tenantUid`（可空） | OperationResult |
+| `deleteRole(DeleteRoleRpcRequest)` | `roleId`、`tenantUid`（可空） | OperationResult |
+| `assignPermissions(AssignPermissionsRpcRequest)` | `roleId`、`tenantUid`（可空）、`permissionIds`（全量覆盖） | OperationResult |
 
 ### 7.5 PermissionRpcServiceProtobuf —— 权限管理
 
-| 方法 | 请求关键字段 | 失败语义 |
+| 方法 | 请求关键字段（业务 ID 数字字符串；tenantUid 为随机串） | 失败语义 |
 |------|--------------|----------|
-| `getAllPermissions(GetAllPermissionsRequest)` | `tenantId` | 空列表 |
-| `getPermissionById(GetPermissionByIdRequest)` | `permissionId`、`tenantId` | `id==0` |
-| `createPermission(CreatePermissionRpcRequest)` | `code`、`name`、`resource`、`action`、`description`、`tenantId` | 成功返回新建权限；失败 → `id==0` |
-| `deletePermission(DeletePermissionRpcRequest)` | `permissionId`、`tenantId` | OperationResult |
+| `getAllPermissions(GetAllPermissionsRequest)` | `tenantUid` | 空列表 |
+| `getPermissionById(GetPermissionByIdRequest)` | `permissionId`、`tenantUid`（可空，规则 3） | `id==0` |
+| `createPermission(CreatePermissionRpcRequest)` | `code`、`name`、`resource`、`action`、`description`、`tenantUid` | 成功返回新建权限；失败 → `id==0` |
+| `deletePermission(DeletePermissionRpcRequest)` | `permissionId`、`tenantUid`（可空） | OperationResult |
 
 ### 7.6 OAuthRpcServiceProtobuf —— 第三方登录编排
 
@@ -595,7 +592,7 @@ private AuthRpcServiceProtobuf authRpcService;
 
 #### `buildBindAuthorizeUrl(OAuthBindUrlRpcRequest) → OAuthUrlRpcResponse`
 
-字段：`tenantId`、`userId`（数字字符串）、`provider`。为已登录用户发起第三方账号绑定授权。失败 → `url` 空串。
+字段：`tenantUid`（随机串）、`userId`（数字字符串）、`provider`。为已登录用户发起第三方账号绑定授权。失败 → `url` 空串。
 
 #### `handleCallback(OAuthCallbackRpcRequest) → OAuthCallbackRpcResult`
 
@@ -609,11 +606,11 @@ private AuthRpcServiceProtobuf authRpcService;
 
 #### `listBindings(OAuthBindingsRpcRequest) → OAuthBindingListRpcResponse`
 
-字段：`tenantId`、`userId`（数字字符串）。返回 `getBindingsList()`，元素含 `id`、`provider`、`providerUid`、`createdAt`（epoch 毫秒）。
+字段：`tenantUid`（随机串）、`userId`（数字字符串）。返回 `getBindingsList()`，元素含 `id`、`provider`、`providerUid`、`createdAt`（epoch 毫秒）。
 
 #### `unbind(OAuthUnbindRpcRequest) → OperationResult`
 
-字段：`tenantId`、`userId`（数字字符串）、`provider`。未绑定 → `success=false`。
+字段：`tenantUid`（随机串）、`userId`（数字字符串）、`provider`。未绑定 → `success=false`。
 
 ### 7.7 ContactBindingRpcServiceProtobuf —— 邮箱/手机绑定
 
@@ -621,10 +618,10 @@ private AuthRpcServiceProtobuf authRpcService;
 
 | 方法 | 请求字段 | 前置条件 |
 |------|----------|----------|
-| `bindEmail(BindContactRpcRequest)` | `userId`、`tenantId`（数字字符串）、`method`（email 类）、`target`（新邮箱）、`code` | 先对该 target 调 `sendCode`；target 未被同租户他人占用 |
-| `unbindEmail(ContactUnbindRpcRequest)` | `userId`、`tenantId` | 当前已绑定邮箱 |
+| `bindEmail(BindContactRpcRequest)` | `userId`、`tenantUid`（随机串）、`method`（email 类）、`target`（新邮箱）、`code` | 先对该 target 调 `sendCode`；target 未被同租户他人占用 |
+| `unbindEmail(ContactUnbindRpcRequest)` | `userId`、`tenantUid` | 当前已绑定邮箱 |
 | `bindPhone(BindContactRpcRequest)` | 同上，`method` 为 sms 类、`target` 为新手机号 | 同上 |
-| `unbindPhone(ContactUnbindRpcRequest)` | `userId`、`tenantId` | 当前已绑定手机号 |
+| `unbindPhone(ContactUnbindRpcRequest)` | `userId`、`tenantUid` | 当前已绑定手机号 |
 
 `bindEmail` 的 `method` 只能是 `email:aliyun`/`email:smtp`；`bindPhone` 只能是 `sms:aliyun`（类别不匹配 → `success=false`）。
 
@@ -634,8 +631,8 @@ private AuthRpcServiceProtobuf authRpcService;
 |------|----------|------|
 | `listPlatformConfigs(Empty)` | 无 | 返回全部 6 种方式的平台开关/凭证状态（`LoginMethodListRpcResponse.getItemsList()`） |
 | `savePlatformConfig(SavePlatformLoginMethodRpcRequest)` | `method`、`enabled`（password 传 0 会被拒绝）、`configJson`（明文凭证 JSON，空=不改） | OperationResult |
-| `listTenantConfigs(TenantLoginMethodRpcRequest)` | `tenantId`（数字字符串） | 仅返回平台已开启的方式 |
-| `saveTenantConfig(SaveTenantLoginMethodRpcRequest)` | `tenantId`、`method`（须平台已开启）、`enabled`、`usePlatformConfig`（1=平台凭证 0=自有）、`configJson` | 邮箱类互斥：同租户启用第二种 email 方式 → `success=false` |
+| `listTenantConfigs(TenantLoginMethodRpcRequest)` | `tenantUid`（随机串） | 仅返回平台已开启的方式 |
+| `saveTenantConfig(SaveTenantLoginMethodRpcRequest)` | `tenantUid`、`method`（须平台已开启）、`enabled`、`usePlatformConfig`（1=平台凭证 0=自有）、`configJson` | 邮箱类互斥：同租户启用第二种 email 方式 → `success=false` |
 | `listEnabledMethods(EnabledLoginMethodsRpcRequest)` | `tenantUid`（**随机串**，空 → 空列表） | 返回 `StringListResponse`，供登录页渲染 |
 
 `configJson` 结构（各方式字段，均为字符串值）：
@@ -665,7 +662,7 @@ private AuthRpcServiceProtobuf authRpcService;
 
 | 请求字段 | 必填 | 说明 |
 |----------|------|------|
-| `tenantId` / `userId` | 是 | 数字字符串；头像归属该用户（编辑他人传目标 id） |
+| `tenantUid` / `userId` | 是 | tenantUid 随机串、userId 数字字符串；头像归属该用户（编辑他人传目标 id） |
 | `filename` | 是 | 原始文件名，扩展名限 jpg/jpeg/png/gif/webp |
 | `contentType` | 是 | MIME 类型 |
 | `data` | 是 | 文件字节（`ByteString.copyFrom(bytes)`），≤ 2MB |
@@ -694,7 +691,7 @@ public class AuthGuard {
         if (!r.getValid()) {
             throw new UnauthorizedException("令牌无效或已过期");
         }
-        return r;   // r.getUserId() / r.getTenantId() / r.getRolesList() / r.getPermissionsList()
+        return r;   // r.getUserId() / r.getTenantUid() / r.getRolesList() / r.getPermissionsList()
     }
 
     /** 细粒度权限判断 */
@@ -738,7 +735,7 @@ if (login.getSuccess()) {
 ```java
 TokenRpcResponse token = tokenRpc.generateToken(TokenGenerationRequest.newBuilder()
         .setUserId("123456789")     // 数字字符串
-        .setTenantId("1")           // "0" = 不限定租户
+        .setTenantUid("dm3a9x1f")   // 留空 = 不限定租户
         .setExpiration(3600)        // 秒
         .build());
 if (token.getAccessToken().isEmpty()) {   // 失败=空实例
@@ -777,16 +774,16 @@ if (result.getLogin() && result.getToken().getAccessToken().length() > 0) {
 ```java
 // 禁用用户（注意字段掩码）
 userRpc.updateUser(UpdateUserRpcRequest.newBuilder()
-        .setUserId("123456789").setTenantId("1")
+        .setUserId("123456789").setTenantUid("dm3a9x1f")
         .setStatus(0)
         .addFieldsToUpdate("status")
         .build());
 
 // 全量覆盖角色（先查租户角色列表拿到目标 roleId）
 RoleListResponse roles = roleRpc.getAllRoles(
-        GetAllRolesRequest.newBuilder().setTenantId("1").build());
+        GetAllRolesRequest.newBuilder().setTenantUid("dm3a9x1f").build());
 AssignRolesRpcRequest.Builder ab = AssignRolesRpcRequest.newBuilder()
-        .setUserId("123456789").setTenantId("1");
+        .setUserId("123456789").setTenantUid("dm3a9x1f");
 roles.getRolesList().stream()
         .filter(r -> "ROLE_ADMIN".equals(r.getCode()))
         .forEach(r -> ab.addRoleIds(String.valueOf(r.getId())));
@@ -801,7 +798,7 @@ OperationResult r = userRpc.assignRoles(ab.build());
 | 抛 `RpcException: RPC service token is invalid or missing` | 未设置 attachment 或 token 不一致 | 见第 4 节；向 auth-service 运维方索取正确的 `RPC_SERVICE_TOKEN` |
 | 抛 `RpcException`（timeout） | auth-service 无响应 | 检查 auth-service 20880 端口连通性与服务健康 |
 | 依赖解析失败 `Could not find artifact cn.wanyj.auth:auth-service-api` | 未安装 API jar | 见第 2 节 `mvn install` |
-| 查询用户返回 `id == 0`，但用户确实存在 | ① tenantId 传错/传成 tenantUid ② 用户被禁用 ③ 跨租户归属校验 | 逐一核对规则 1/2/3/5 |
+| 查询用户返回 `id == 0`，但用户确实存在 | ① tenantUid 传错/传了数字 ② 用户被禁用 ③ 跨租户归属校验 | 逐一核对规则 1/2/3/5 |
 | `parseToken` 恒 `valid=false` | 令牌被登出拉黑 / 过期 / 传了 refreshToken | 确认传的是 Access Token；过期就走 refreshToken 流程 |
 | 写操作报「用户名已存在」但你是首次调用 | retries>0 导致重试重复执行 | 写操作 `retries = 0`（规则 8） |
 | `sendCode` 报「该登录方式未启用」 | 租户未启用该方式或平台未开启 | 走 HTTP 管理端或 `LoginMethodRpcService` 开启并配置凭证 |
@@ -817,7 +814,7 @@ OperationResult r = userRpc.assignRoles(ab.build());
 - [ ] 启动类加了 `@EnableDubbo`
 - [ ] 所有 `@DubboReference` 带 `version = "1.0.0"`
 - [ ] 每次调用前设置 attachment `rpc-service-token`（或已确认服务端未启用鉴权）
-- [ ] 所有 ID 字段传数字字符串（tenantUid 场景除外：sendCode/loginByCode/buildAuthorizeUrl/listEnabledMethods）
+- [ ] 租户参数一律传 `tenantUid` 随机串；其余 ID 字段传数字字符串
 - [ ] 业务失败按响应字段判断（`success` / `id==0` / `valid` / 空串），仅捕获 `RpcException`
 - [ ] 写操作 `retries = 0`
 - [ ] `updateUser` 带字段掩码
