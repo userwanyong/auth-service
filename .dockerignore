@@ -44,3 +44,7 @@ docs/
 Dockerfile
 .dockerignore
 docker-compose.yml
+
+# Secrets / local config
+.env
+.local-config

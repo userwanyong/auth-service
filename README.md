@@ -41,7 +41,7 @@
 - **Web 管理界面**：内置前端管理界面，支持用户 / 角色 / 权限 / 租户 / 登录方式 / 第三方绑定 / 账号资料管理
 - **RBAC 权限模型**：用户-角色-权限三层模型，支持完整的 CRUD 权限
 - **平台级权限**：平台租户（tenant_id=0）+ `ROLE_PLATFORM_ADMIN` 角色控制租户管理与平台级登录方式配置
-- **JWT 双令牌机制**：Access Token（15 分钟）+ Refresh Token（7 天），基于 jti 的令牌黑名单
+- **JWT 双令牌机制**：Access Token（1 天）+ Refresh Token（7 天），基于 jti 的令牌黑名单
 - **邮箱/手机绑定管理**：账号页凭验证码绑定 / 换绑 / 解绑邮箱与手机号，管理员代改视为已验证
 - **安全防护**：登录滑动窗口限流、验证码发送限流、OAuth state 防 CSRF（一次性、10 分钟有效）、RPC 服务间令牌鉴权
 - **审计日志**：异步记录用户操作（登录 / 注册 / 登出 / 改密 / 绑定等）
@@ -130,6 +130,11 @@ mysql -u root -p < docs/init-schema.sql
 cp .env.example .env
 ```
 
+加载机制（[spring-dotenv](https://github.com/paulschwarz/spring-dotenv)）：
+
+- **本地调试**：应用启动时自动加载项目根目录的 `.env`（从运行目录向上查找，IDEA 直接运行或 `mvn spring-boot:run` 均可生效），无需在 IDE 里手动配置环境变量。
+- **部署打包后**：直接编辑 `docker-compose.yml` 中 `environment` 的配置值即可——容器内环境变量优先级高于 `application.yaml` 中的占位符默认值。`application.yaml` 与 `docker-compose.yml` 中均不含任何真实密钥，仓库里只有 `your_*` 占位样例。
+
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `DB_USERNAME` / `DB_PASSWORD` | 是 | MySQL 账号密码 |
@@ -137,6 +142,8 @@ cp .env.example .env
 | `JWT_SECRET` | 是 | JWT 签名密钥（`openssl rand -base64 32` 生成） |
 | `LOGIN_CONFIG_AES_KEY` | 是 | 登录方式凭证加密密钥（AES，`openssl rand -base64 32` 生成），用于加密 `login_method_config.config_json` |
 | `RPC_SERVICE_TOKEN` | 建议 | Dubbo 服务间调用鉴权令牌，未配置时跳过 RPC 鉴权 |
+| `NACOS_USERNAME` / `NACOS_PASSWORD` | 视情况 | Nacos 开启鉴权时必填，未开启可留空 |
+| `DB_URL` / `REDIS_HOST` / `REDIS_PORT` / `NACOS_ADDRESS` | 可选 | 默认本机地址（`localhost`） |
 | `OSS_ENDPOINT` / `OSS_BUCKET` / `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET` | 可选 | 阿里云 OSS（头像上传） |
 | `OSS_OBJECT_PREFIX` | 可选 | 对象前缀，默认 `avatar` |
 
@@ -151,8 +158,9 @@ cp .env.example .env
 **方式二：本地开发**
 
 1. 启动 MySQL、Redis、Nacos
-2. 导入项目为 Maven 工程，等待依赖下载
-3. 运行 `Application` 主类（IDEA / Eclipse），或：
+2. 准备根目录 `.env`（见[配置环境变量](#2-配置环境变量)，spring-dotenv 启动时自动加载）
+3. 导入项目为 Maven 工程，等待依赖下载
+4. 运行 `Application` 主类（IDEA / Eclipse），或：
 
 ```bash
 mvn spring-boot:run -pl auth-service-core
@@ -922,7 +930,7 @@ oauth:state:{state}                          # OAuth state（10分钟一次性�
 
 | 令牌类型 | 有效期 | 用途 |
 |----------|--------|------|
-| Access Token | 15 分钟 | API 认证（`Authorization: Bearer <token>`） |
+| Access Token | 1 天 | API 认证（`Authorization: Bearer <token>`） |
 | Refresh Token | 7 天 | 令牌续期（Redis 单点存储，刷新即轮换） |
 
 JWT Claims：
@@ -987,7 +995,7 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET:}                 # 未设置时启动失败
-  access-token-expiration: 900000        # 15 分钟
+  access-token-expiration: 86400000      # 1 天
   refresh-token-expiration: 604800000    # 7 天
 
 login-config:
@@ -1007,7 +1015,9 @@ dubbo:
     port: 20880
     serialization: protobuf
   registry:
-    address: nacos://localhost:8848
+    address: ${NACOS_ADDRESS:nacos://localhost:8848}
+    username: ${NACOS_USERNAME:}          # Nacos 开启鉴权时配置
+    password: ${NACOS_PASSWORD:}
   rpc:
     service-token: ${RPC_SERVICE_TOKEN:}  # RPC 服务间鉴权令牌
   scan:
@@ -1080,14 +1090,18 @@ mybatis:
 
 前置准备：MySQL、Redis、Nacos 已就绪，并已执行 `docs/init-schema.sql`。
 
-项目自带多阶段构建 [Dockerfile](Dockerfile)（Maven 构建 → JRE 运行，非 root 用户，含健康检查）。`docker-compose.yml` 示例：
+项目自带多阶段构建 [Dockerfile](Dockerfile)（Maven 构建 → JRE 运行，非 root 用户，含健康检查）。
+
+**配置方式**：`docker-compose.yml` 中的 `environment` 列出了全部配置项，仓库中均为 `your_*` 占位样例（Nacos 账密默认 `nacos/nacos`，与 Nacos 默认安装一致）。部署时直接把占位值替换为真实配置即可，容器内环境变量会覆盖 `application.yaml` 中的占位符默认值。
+
+`docker-compose.yml` 示例：
 
 ```yaml
 version: '3.8'
 
 services:
   auth-service:
-    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:4.0
+    image: registry.cn-wulanchabu.aliyuncs.com/wanyj/auth-service:5.0
     container_name: auth-service-app
     restart: unless-stopped
     environment:
@@ -1106,13 +1120,16 @@ services:
       LOGIN_CONFIG_AES_KEY: your_login_config_aes_key
       # RPC Service Token (for inter-service authentication)
       RPC_SERVICE_TOKEN: your_rpc_service_token
-      # Nacos
-      dubbo.registry.address: nacos://127.0.0.1:8848
-      dubbo.registry.username: nacos
-      dubbo.registry.password: nacos
-      dubbo.metadata-report.address: nacos://127.0.0.1:8848
-      dubbo.metadata-report.username: nacos
-      dubbo.metadata-report.password: nacos
+      # 阿里云 OSS（可选，头像上传；不配置则上传接口返回「OSS 未配置」）
+      OSS_ENDPOINT: your_oss_endpoint
+      OSS_BUCKET: your_oss_bucket
+      OSS_ACCESS_KEY_ID: your_oss_access_key_id
+      OSS_ACCESS_KEY_SECRET: your_oss_access_key_secret
+      OSS_OBJECT_PREFIX: avatar
+      # Nacos（同时作用于 dubbo registry 和 metadata-report；默认账密 nacos/nacos，开启鉴权后请修改）
+      NACOS_ADDRESS: nacos://127.0.0.1:8848
+      NACOS_USERNAME: nacos
+      NACOS_PASSWORD: nacos
       # JVM
       JAVA_OPTS: >-
         -XX:+UseContainerSupport

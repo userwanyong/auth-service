@@ -29,7 +29,7 @@ public class JwtTokenProvider {
     @Value("${jwt.secret:}")
     private String secret;
 
-    @Value("${jwt.access-token-expiration:900000}") // 15 minutes in milliseconds
+    @Value("${jwt.access-token-expiration:86400000}") // 1 day in milliseconds
     private Long accessTokenExpiration;
 
     @Value("${jwt.refresh-token-expiration:604800000}") // 7 days in milliseconds
