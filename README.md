@@ -1106,6 +1106,10 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
+      # Dubbo 注册到 Nacos 的地址：不设置时默认注册容器内网 IP，
+      # 外部无法直连，这里强制注册宿主机公网 IP
+      DUBBO_IP_TO_REGISTRY: 127.0.0.1
+      DUBBO_PORT_TO_REGISTRY: 20880
       # Database
       SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/auth_service?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
